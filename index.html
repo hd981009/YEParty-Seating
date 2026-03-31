@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>尾牙排座系統 - V8 數據連動版</title>
+    <title>尾牙排座系統 - V9 員編擴展版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
     <style>
@@ -12,7 +12,7 @@
         .canvas-container { display: grid; grid-template-columns: repeat(20, 70px); gap: 10px; padding: 30px; }
         .status-full { border: 3px solid currentColor !important; } 
         .status-partial { border: 3px dashed #f97316 !important; } 
-        .status-over { animation: pulse-red 1s infinite; border: 4px solid #ef4444 !important; } 
+        .status-over { animation: pulse-red 1.5s infinite; border: 4px solid #ef4444 !important; } 
         @keyframes pulse-red { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
         .modal-bg { background-color: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
     </style>
@@ -32,14 +32,14 @@
         <div class="space-y-2 mb-4">
             <button onclick="openDataModal()" class="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
-                開啟名單 / 新增資料
+                開啟名單 / 編輯員編
             </button>
             <input type="file" id="excel-upload" class="hidden" accept=".xlsx, .xls"/>
         </div>
 
         <div id="dept-area" class="flex-1 overflow-y-auto border-t pt-4">
             <div class="flex justify-between items-center mb-3">
-                <h3 class="font-bold text-slate-700 text-xs uppercase tracking-wider">單位待排統計</h3>
+                <h3 class="font-bold text-slate-700 text-xs uppercase tracking-wider">單位統計</h3>
                 <span id="veg-total-info" class="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">素食: 0</span>
             </div>
             <div id="dept-list" class="space-y-1"></div>
@@ -54,11 +54,11 @@
     </div>
 
     <div id="data-modal" class="hidden fixed inset-0 modal-bg flex items-center justify-center z-[100]">
-        <div class="bg-white rounded-2xl shadow-2xl w-[90%] h-[80%] flex flex-col p-6">
+        <div class="bg-white rounded-2xl shadow-2xl w-[95%] h-[85%] flex flex-col p-6">
             <div class="flex justify-between items-center mb-4">
                 <div>
-                    <h3 class="text-xl font-black text-slate-800">名單數據管理</h3>
-                    <p class="text-xs text-slate-400">您可以直接修改表格或點擊「新增一列」</p>
+                    <h3 class="text-xl font-black text-slate-800">名單數據管理 (含員編)</h3>
+                    <p class="text-xs text-slate-400">欄位：單位 | 組別 | 員編 | 姓名 | 飲食</p>
                 </div>
                 <div class="flex gap-2">
                     <button onclick="document.getElementById('excel-upload').click()" class="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg font-bold text-sm">匯入 Excel</button>
@@ -70,11 +70,12 @@
                 <table class="w-full text-left text-sm border-collapse">
                     <thead class="bg-slate-50 sticky top-0 shadow-sm">
                         <tr>
-                            <th class="p-3 border-b">部門/單位</th>
+                            <th class="p-3 border-b">單位/部門</th>
                             <th class="p-3 border-b">組別</th>
+                            <th class="p-3 border-b bg-indigo-50/50">員編</th>
                             <th class="p-3 border-b">姓名</th>
                             <th class="p-3 border-b">飲食 (葷/素)</th>
-                            <th class="p-3 border-b w-20">操作</th>
+                            <th class="p-3 border-b w-20 text-center">操作</th>
                         </tr>
                     </thead>
                     <tbody id="data-table-body"></tbody>
@@ -95,43 +96,42 @@
     </div>
 
     <script>
-        let rawData = JSON.parse(localStorage.getItem('v8_raw_data')) || []; // 名單數據庫
-        let tables = JSON.parse(localStorage.getItem('v8_tables')) || [];
-        let currentMode = 'normal';
-        let deptColors = {};
-        const COLORS = ["#4f46e5", "#e11d48", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316"];
+        let rawData = JSON.parse(localStorage.getItem('v9_raw_data')) || []; 
+        let tables = JSON.parse(localStorage.getItem('v9_tables')) || [];
+        let currentMode = 'normal', deptColors = {}, selectedDept = null, draggedTable = null, currentEditingTable = null;
+        const ROWS = 15, COLS = 20, WALKWAY_COL = 11, COLORS = ["#4f46e5", "#e11d48", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316"];
 
-        // --- 名單管理功能 ---
-        function openDataModal() { document.getElementById('data-modal').classList.remove('hidden'); renderDataTable(); }
-        function closeDataModal() { document.getElementById('data-modal').classList.add('hidden'); renderCanvas(); }
-        
+        // --- 名單管理與員編處理 ---
         function renderDataTable() {
             const tbody = document.getElementById('data-table-body');
             tbody.innerHTML = '';
             rawData.forEach((item, index) => {
                 const tr = document.createElement('tr');
-                tr.className = "hover:bg-slate-50 border-b transition-colors";
+                tr.className = "hover:bg-slate-50 border-b";
                 tr.innerHTML = `
-                    <td class="p-2"><input class="w-full bg-transparent p-1 border rounded" value="${item.dept}" onchange="updateData(${index}, 'dept', this.value)"></td>
-                    <td class="p-2"><input class="w-full bg-transparent p-1 border rounded" value="${item.group || ''}" onchange="updateData(${index}, 'group', this.value)"></td>
-                    <td class="p-2"><input class="w-full bg-transparent p-1 border rounded" value="${item.name || ''}" onchange="updateData(${index}, 'name', this.value)"></td>
+                    <td class="p-2"><input class="w-full bg-transparent p-1 border rounded" value="${item.dept||''}" onchange="updateData(${index}, 'dept', this.value)"></td>
+                    <td class="p-2"><input class="w-full bg-transparent p-1 border rounded" value="${item.group||''}" onchange="updateData(${index}, 'group', this.value)"></td>
+                    <td class="p-2 bg-indigo-50/30"><input class="w-full bg-transparent p-1 border border-indigo-200 rounded font-mono text-indigo-700" value="${item.id||''}" onchange="updateData(${index}, 'id', this.value)"></td>
+                    <td class="p-2"><input class="w-full bg-transparent p-1 border rounded" value="${item.name||''}" onchange="updateData(${index}, 'name', this.value)"></td>
                     <td class="p-2">
                         <select class="w-full bg-transparent p-1 border rounded" onchange="updateData(${index}, 'diet', this.value)">
                             <option value="葷" ${item.diet==='葷'?'selected':''}>葷</option>
                             <option value="素" ${item.diet==='素'?'selected':''}>素</option>
                         </select>
                     </td>
-                    <td class="p-2"><button onclick="deleteRow(${index})" class="text-red-400 hover:text-red-600">刪除</button></td>
+                    <td class="p-2 text-center"><button onclick="deleteRow(${index})" class="text-red-400 hover:text-red-600">✕</button></td>
                 `;
                 tbody.appendChild(tr);
             });
         }
 
-        function addRow() { rawData.unshift({ dept: '新單位', group: '', name: '', diet: '葷' }); renderDataTable(); save(); }
         function updateData(idx, key, val) { rawData[idx][key] = val; save(); }
-        function deleteRow(idx) { if(confirm('確定刪除此筆資料？')){ rawData.splice(idx, 1); renderDataTable(); save(); } }
+        function addRow() { rawData.unshift({ dept: '新單位', group: '', id: '', name: '', diet: '葷' }); renderDataTable(); save(); }
+        function deleteRow(idx) { if(confirm('刪除此同仁？')){ rawData.splice(idx, 1); renderDataTable(); save(); } }
+        function openDataModal() { document.getElementById('data-modal').classList.remove('hidden'); renderDataTable(); }
+        function closeDataModal() { document.getElementById('data-modal').classList.add('hidden'); renderCanvas(); }
 
-        // --- 核心計算與畫布 ---
+        // --- 核心邏輯 ---
         function getStats() {
             let stats = {};
             rawData.forEach(d => {
@@ -157,8 +157,6 @@
 
             const canvas = document.getElementById('canvas');
             canvas.innerHTML = '';
-            const stats = getStats();
-
             for (let r = 1; r <= ROWS; r++) {
                 for (let c = 1; c <= COLS; c++) {
                     const cell = document.createElement('div');
@@ -166,30 +164,24 @@
                     const table = tables.find(t => t.r === r && t.c === c);
 
                     if (table) {
-                        const totalPeople = (table.assigned || []).reduce((s, a) => s + a.count, 0);
-                        const vegCount = (table.assigned || []).reduce((s, a) => s + (a.veg || 0), 0);
+                        const total = (table.assigned || []).reduce((s, a) => s + a.count, 0);
+                        const veg = (table.assigned || []).reduce((s, a) => s + (a.veg || 0), 0);
+                        let sc = total > table.capacity ? 'status-over' : (total === table.capacity ? 'status-full' : (total > 0 ? 'status-partial' : ''));
                         
-                        let statusClass = totalPeople > table.capacity ? 'status-over' : (totalPeople === table.capacity ? 'status-full' : (totalPeople > 0 ? 'status-partial' : ''));
                         const tableEl = document.createElement('div');
                         tableEl.draggable = true;
-                        tableEl.className = `w-14 h-14 rounded-full shadow-lg flex flex-col items-center justify-center text-white text-center transition-all ${statusClass}`;
+                        tableEl.className = `w-14 h-14 rounded-full shadow-lg flex flex-col items-center justify-center text-white transition-all ${sc}`;
                         tableEl.style.backgroundColor = table.themeColor || (table.type === 'main' ? '#fbbf24' : '#6366f1');
-                        
                         tableEl.innerHTML = `<div class="text-[9px] font-black">${table.displayId}</div>`;
                         (table.assigned || []).slice(0,2).forEach(a => {
                             tableEl.innerHTML += `<div class="text-[8px] font-bold leading-tight">${a.dept.substring(0,2)}${a.count}</div>`;
                         });
-                        if(vegCount > 0) tableEl.innerHTML += `<div class="text-[7px] bg-green-500/50 px-1 rounded">素:${vegCount}</div>`;
+                        if(veg > 0) tableEl.innerHTML += `<div class="text-[7px] bg-green-500/50 px-1 rounded">素:${veg}</div>`;
 
-                        tableEl.onclick = (e) => {
-                            e.stopPropagation();
-                            if(selectedDept) assignToTable(table);
-                            else openManageModal(table);
-                        };
+                        tableEl.onclick = (e) => { e.stopPropagation(); if(selectedDept) assignToTable(table); else openManageModal(table); };
                         tableEl.oncontextmenu = (e) => { e.preventDefault(); if(confirm(`刪除桌號 ${table.displayId}？`)) { tables = tables.filter(t => t !== table); renderCanvas(); } };
                         tableEl.ondragstart = () => { draggedTable = table; tableEl.style.opacity = "0.3"; };
                         tableEl.ondragend = () => { draggedTable = null; renderCanvas(); };
-
                         cell.appendChild(tableEl);
                     } else {
                         cell.className += " border border-dashed border-slate-200 hover:bg-indigo-50 cursor-pointer";
@@ -200,60 +192,37 @@
                     canvas.appendChild(cell);
                 }
             }
-            renderSidebar();
-            save();
+            renderSidebar(); save();
         }
 
-        let selectedDept = null;
         function renderSidebar() {
-            const list = document.getElementById('dept-list');
+            const list = document.getElementById('dept-list'), stats = getStats();
             list.innerHTML = '';
-            const stats = getStats();
-            let totalVeg = 0;
-            Object.values(stats).forEach(s => totalVeg += s.veg);
-            document.getElementById('veg-total-info').innerText = `總素食: ${totalVeg}`;
+            let vT = 0; Object.values(stats).forEach(s => vT += s.veg);
+            document.getElementById('veg-total-info').innerText = `總素食: ${vT}`;
 
-            Object.keys(stats).forEach((dName, idx) => {
-                if(!deptColors[dName]) deptColors[dName] = COLORS[idx % COLORS.length];
-                const remain = getRemain(dName);
-                const isSel = selectedDept === dName;
+            Object.keys(stats).forEach((d, i) => {
+                if(!deptColors[d]) deptColors[d] = COLORS[i % COLORS.length];
+                const rem = getRemain(d), isSel = selectedDept === d;
                 const div = document.createElement('div');
-                div.className = `p-2 rounded cursor-pointer border mb-1 text-xs font-bold flex justify-between items-center transition-all ${isSel ? 'bg-slate-800 text-white scale-105 shadow-md' : 'bg-white hover:border-indigo-300'}`;
-                div.style.borderLeft = `4px solid ${deptColors[dName]}`;
-                // 如果人數為負數，顯示紅色
-                const remainColor = remain < 0 ? 'text-red-500' : (isSel ? 'text-white' : 'text-slate-400');
-                div.innerHTML = `<span>${dName} <span class="text-[9px] opacity-60">(素:${stats[dName].veg})</span></span><span class="${remainColor}">${remain}人</span>`;
-                div.onclick = () => { selectedDept = isSel ? null : dName; renderSidebar(); };
+                div.className = `p-2 rounded cursor-pointer border mb-1 text-xs font-bold flex justify-between items-center transition-all ${isSel ? 'bg-slate-800 text-white scale-105' : 'bg-white hover:border-indigo-300'}`;
+                div.style.borderLeft = `4px solid ${deptColors[d]}`;
+                div.innerHTML = `<span>${d} <span class="text-[9px] opacity-60">(${stats[d].veg}素)</span></span><span class="${rem<0?'text-red-500':''}">${rem}人</span>`;
+                div.onclick = () => { selectedDept = isSel ? null : d; renderSidebar(); };
                 list.appendChild(div);
             });
         }
 
         function assignToTable(table) {
-            const remain = getRemain(selectedDept);
-            const stats = getStats()[selectedDept];
-            const inputCount = prompt(`分配 [${selectedDept}] 到 ${table.displayId}，請輸入人數：`, Math.max(0, remain));
-            const count = parseInt(inputCount);
-            
+            const rem = getRemain(selectedDept);
+            const input = prompt(`分配 [${selectedDept}] 到 ${table.displayId}\n剩餘: ${rem} 人，請輸入人數：`, Math.max(0, rem));
+            const count = parseInt(input);
             if(count > 0) {
-                // 詢問素食人數
-                const vegInput = prompt(`這 ${count} 人中有幾位素食者？`, "0");
-                const vegCount = parseInt(vegInput) || 0;
-                
-                table.assigned.push({ dept: selectedDept, count, veg: vegCount });
+                const vegIn = prompt(`這 ${count} 人中有幾位素食者？`, "0");
+                table.assigned.push({ dept: selectedDept, count, veg: parseInt(vegIn)||0 });
                 if(!table.themeColor) table.themeColor = deptColors[selectedDept];
-                selectedDept = null;
-                renderCanvas();
+                selectedDept = null; renderCanvas();
             }
-        }
-
-        // --- 通用功能 ---
-        const ROWS = 15, COLS = 20, WALKWAY_COL = 11;
-        let draggedTable = null;
-
-        function setMode(m) { 
-            currentMode = m; 
-            document.getElementById('mode-normal').className = m==='normal' ? 'flex-1 py-2 rounded bg-indigo-600 text-white text-xs font-bold shadow-md' : 'flex-1 py-2 rounded bg-white border text-slate-600 text-xs font-bold';
-            document.getElementById('mode-main').className = m==='main' ? 'flex-1 py-2 rounded bg-amber-500 text-white text-xs font-bold shadow-md' : 'flex-1 py-2 rounded bg-white border text-slate-600 text-xs font-bold';
         }
 
         function openManageModal(table) {
@@ -280,37 +249,11 @@
         function removeAssign(idx) { currentEditingTable.assigned.splice(idx,1); if(currentEditingTable.assigned.length===0) currentEditingTable.themeColor=null; openManageModal(currentEditingTable); }
         function closeManageModal() { document.getElementById('manage-modal').classList.add('hidden'); renderCanvas(); }
 
-        function save() {
-            localStorage.setItem('v8_raw_data', JSON.stringify(rawData));
-            localStorage.setItem('v8_tables', JSON.stringify(tables));
+        function setMode(m) { 
+            currentMode = m; 
+            document.getElementById('mode-normal').className = m==='normal' ? 'flex-1 py-2 rounded bg-indigo-600 text-white text-xs font-bold shadow-md' : 'flex-1 py-2 rounded bg-white border text-slate-600 text-xs font-bold';
+            document.getElementById('mode-main').className = m==='main' ? 'flex-1 py-2 rounded bg-amber-500 text-white text-xs font-bold shadow-md' : 'flex-1 py-2 rounded bg-white border text-slate-600 text-xs font-bold';
         }
 
-        // Excel 匯入
-        document.getElementById('excel-upload').onchange = (e) => {
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                const raw = XLSX.utils.sheet_to_json(XLSX.read(new Uint8Array(ev.target.result), {type:'array'}).Sheets[0]);
-                const newData = raw.map(item => {
-                    const dKey = Object.keys(item).find(k => k.includes('單位') || k.includes('部門'));
-                    const gKey = Object.keys(item).find(k => k.includes('組別') || k.includes('組'));
-                    const nKey = Object.keys(item).find(k => k.includes('姓名'));
-                    const vKey = Object.keys(item).find(k => k.includes('飲食') || k.includes('習慣') || k.includes('素'));
-                    
-                    let diet = '葷';
-                    const dietVal = String(item[vKey] || '');
-                    if(dietVal.includes('素')) diet = '素';
-
-                    return { dept: item[dKey] || '未知', group: item[gKey] || '', name: item[nKey] || '', diet: diet };
-                });
-                rawData = [...newData, ...rawData];
-                save();
-                renderDataTable();
-                renderSidebar();
-            };
-            reader.readAsArrayBuffer(e.target.files[0]);
-        };
-
-        renderCanvas();
-    </script>
-</body>
-</html>
+        function save() {
+            localStorage.setItem('v
