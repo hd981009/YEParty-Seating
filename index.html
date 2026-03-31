@@ -3,144 +3,187 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>尾牙排座系統 - 編輯模式</title>
+    <title>尾牙排座系統 - Excel 匯入版</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
     <style>
-        .main-walkway { margin-right: 80px; }
+        .main-walkway { margin-right: 100px; }
         .grid-container {
             display: grid;
             grid-template-columns: repeat(12, minmax(80px, 1fr));
-            gap: 1.5rem;
+            gap: 1rem;
             justify-content: center;
         }
+        .sidebar { width: 300px; transition: all 0.3s; }
+        .table-circle { transition: all 0.2s; position: relative; }
+        .table-circle:hover { transform: scale(1.05); }
     </style>
 </head>
-<body class="bg-slate-50 p-8 font-sans min-h-screen pb-32">
+<body class="bg-slate-100 font-sans min-h-screen flex">
 
-    <h1 class="text-3xl font-extrabold mb-2 text-slate-800 text-center">尾牙排座系統</h1>
-    <p class="text-center text-slate-500 mb-8">點擊桌子可編輯名稱，左下角按鈕可新增桌位</p>
-    
-    <div class="w-full h-16 bg-rose-600 text-white flex items-center justify-center mb-16 rounded-lg shadow-xl max-w-6xl mx-auto font-bold text-xl tracking-widest">
-        STAGE 舞台
-    </div>
+    <div class="sidebar bg-white shadow-xl h-screen sticky top-0 p-6 overflow-y-auto flex flex-col">
+        <h2 class="text-xl font-bold mb-4 text-slate-800 border-b pb-2">資料匯入</h2>
+        
+        <label class="block mb-6">
+            <span class="sr-only">選擇 Excel 檔案</span>
+            <input type="file" id="excel-upload" accept=".xlsx, .xls" 
+                class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"/>
+        </label>
 
-    <div id="grid-container" class="grid-container max-w-7xl mx-auto"></div>
-
-    <div id="edit-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <div class="bg-white p-6 rounded-xl shadow-2xl w-80">
-            <h3 class="text-lg font-bold mb-4">編輯桌位資訊</h3>
-            <input type="text" id="edit-input" class="w-full border-2 border-blue-100 p-2 rounded mb-4 focus:border-blue-500 outline-none" placeholder="輸入單位或桌號">
-            <div class="flex justify-end gap-2">
-                <button onclick="closeModal()" class="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded">取消</button>
-                <button onclick="saveTable()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">儲存</button>
+        <div id="stats-area" class="flex-1">
+            <h3 class="font-bold text-slate-600 mb-3 flex items-center justify-between">
+                待分配名單 
+                <span id="total-count" class="text-xs bg-slate-200 px-2 py-1 rounded">0 人</span>
+            </h3>
+            <div id="dept-list" class="space-y-2">
+                <p class="text-sm text-slate-400 italic text-center py-10">請先上傳 Excel 資料表</p>
             </div>
         </div>
+        
+        <div class="mt-auto pt-4 border-t text-[10px] text-slate-400">
+            * 欄位需包含：單位、組別、姓名、飲食選擇
+        </div>
     </div>
 
-    <div class="fixed bottom-10 left-10 flex flex-col items-start gap-4">
-        <div id="status-tip" class="hidden bg-blue-600 text-white text-sm px-4 py-2 rounded-full shadow-lg animate-bounce">
-            ✨ 請點選虛線區域新增桌子
+    <div class="flex-1 p-8 overflow-auto">
+        <div class="max-w-7xl mx-auto">
+            <div class="flex justify-between items-end mb-8">
+                <div>
+                    <h1 class="text-3xl font-black text-slate-800">尾牙座位配置圖</h1>
+                    <p class="text-slate-500">點擊左側單位，再點擊右側桌子進行分配</p>
+                </div>
+                <div class="flex gap-4 bg-white p-3 rounded-lg shadow-sm border border-slate-200">
+                    <div class="flex items-center gap-2 text-sm text-slate-600">
+                        <div class="w-3 h-3 bg-blue-500 rounded-full"></div> 一般桌 (10人)
+                    </div>
+                    <div class="flex items-center gap-2 text-sm text-slate-600">
+                        <div class="w-3 h-3 bg-amber-400 rounded-full"></div> 主桌 (12人)
+                    </div>
+                </div>
+            </div>
+
+            <div class="w-full h-12 bg-rose-600 text-white flex items-center justify-center mb-16 rounded-md shadow-md font-bold tracking-[1em]">
+                STAGE 舞台
+            </div>
+
+            <div id="grid-container" class="grid-container"></div>
         </div>
-        <button id="add-btn" class="group p-5 rounded-full shadow-2xl bg-white text-blue-600 hover:bg-blue-600 hover:text-white border-2 border-blue-50 transition-all active:scale-95">
-            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-        </button>
     </div>
+
+    <div id="toast" class="fixed top-5 right-5 bg-black text-white px-6 py-3 rounded-lg shadow-2xl transform translate-x-full transition-transform duration-300 z-[100]"></div>
 
     <script>
-        const ROWS = 9;
-        const COLS = 12;
-        const MAIN_WALKWAY_AFTER = 6;
-        let isAddMode = false;
-        let editingId = null;
-        
-        // 初始資料存放在本地瀏覽器或預設
-        let tables = JSON.parse(localStorage.getItem('tailwan_tables')) || [];
+        let rawData = [];
+        let deptStats = {};
+        let tables = JSON.parse(localStorage.getItem('v3_tables')) || [];
+        let selectedDeptGroup = null; // 當前選中要分配的單位組別
 
-        if (tables.length === 0) {
-            // 如果沒資料，生成預設 12x9
+        // 1. 初始化桌位 (12x9)
+        function initTables() {
+            if (tables.length > 0) return;
+            const ROWS = 9;
+            const COLS = 12;
             for (let r = 1; r <= ROWS; r++) {
                 for (let c = 1; c <= COLS; c++) {
+                    const isMain = (r === 1 && c === 6);
                     if (r === 1 && (c === 6 || c === 7)) {
-                        if (c === 6) tables.push({ id: 'main-1', label: '主桌 1', r, c, isMain: true });
+                        if (c === 6) tables.push({ id: `t-${r}-${c}`, r, c, label: '主桌 1', isMain: true, capacity: 12, assigned: [] });
                     } else {
-                        tables.push({ id: `t-${r}-${c}`, label: `第 ${r}-${c} 桌`, r, c, isMain: false });
+                        tables.push({ id: `t-${r}-${c}`, r, c, label: '', isMain: false, capacity: 10, assigned: [] });
                     }
                 }
             }
         }
 
+        // 2. 讀取 Excel
+        document.getElementById('excel-upload').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const data = new Uint8Array(event.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                rawData = XLSX.utils.sheet_to_json(firstSheet);
+                processData();
+                showToast("✅ 資料匯入成功！");
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        // 3. 處理資料與統計
+        function processData() {
+            deptStats = {};
+            let total = 0;
+            rawData.forEach(item => {
+                const key = `${item['單位']}-${item['組別'] || '無'}`;
+                if (!deptStats[key]) deptStats[key] = { dept: item['單位'], group: item['組別'], count: 0, members: [] };
+                deptStats[key].count++;
+                deptStats[key].members.push(item);
+                total++;
+            });
+            document.getElementById('total-count').innerText = `${total} 人`;
+            renderSidebar();
+        }
+
+        // 4. 渲染左側清單
+        function renderSidebar() {
+            const list = document.getElementById('dept-list');
+            list.innerHTML = '';
+            
+            Object.keys(deptStats).forEach(key => {
+                const item = deptStats[key];
+                // 計算已被分配的人數
+                let assignedCount = 0;
+                tables.forEach(t => {
+                    t.assigned.forEach(a => {
+                        if (a.key === key) assignedCount += a.count;
+                    });
+                });
+                const remaining = item.count - assignedCount;
+
+                if (remaining <= 0) return; // 已全部分配則不顯示
+
+                const div = document.createElement('div');
+                div.className = `p-3 border rounded-lg cursor-pointer transition-all hover:border-blue-500 ${selectedDeptGroup === key ? 'bg-blue-50 border-blue-600 shadow-inner' : 'bg-white'}`;
+                div.onclick = () => selectDept(key);
+                div.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <span class="font-bold text-sm text-slate-700">${item.dept}</span>
+                        <span class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">${remaining} 人</span>
+                    </div>
+                    <div class="text-[10px] text-slate-400 mt-1">${item.group || ''}</div>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        function selectDept(key) {
+            selectedDeptGroup = (selectedDeptGroup === key) ? null : key;
+            renderSidebar();
+        }
+
+        // 5. 渲染桌位畫布
         function renderGrid() {
             const container = document.getElementById('grid-container');
             container.innerHTML = '';
-            localStorage.setItem('tailwan_tables', JSON.stringify(tables));
+            localStorage.setItem('v3_tables', JSON.stringify(tables));
 
-            for (let r = 1; r <= ROWS; r++) {
-                for (let c = 1; c <= COLS; c++) {
-                    const table = tables.find(t => (t.r === r && t.c === c));
-                    const cell = document.createElement('div');
-                    cell.style.width = '80px';
-                    cell.style.height = '80px';
-                    cell.className = `relative rounded-full flex flex-col items-center justify-center transition-all cursor-pointer text-center p-2 `;
-                    
-                    if (c === MAIN_WALKWAY_AFTER) cell.classList.add('main-walkway');
+            tables.forEach(table => {
+                const cell = document.createElement('div');
+                const currentLoad = table.assigned.reduce((sum, a) => sum + a.count, 0);
+                const isOver = currentLoad > table.capacity;
 
-                    if (table) {
-                        if (table.isMain) {
-                            cell.className += "bg-amber-400 scale-125 z-10 shadow-lg ring-4 ring-amber-200 text-amber-900 font-black";
-                        } else {
-                            cell.className += "bg-white shadow-md border border-slate-200 hover:border-blue-400 hover:shadow-blue-100 text-slate-700 font-bold";
-                        }
-                        cell.innerHTML = `<span class="text-[10px] opacity-60 block mb-1">R${r}-C${c}</span><span class="text-xs break-words leading-tight">${table.label}</span>`;
-                        cell.onclick = () => openModal(table.id, table.label);
-                    } else {
-                        cell.className += `border-2 border-dashed border-slate-200 hover:bg-white hover:border-blue-300`;
-                        if (isAddMode) {
-                            cell.classList.add('animate-pulse', 'bg-blue-50');
-                            cell.onclick = () => addTable(r, c);
-                        }
-                    }
-                    container.appendChild(cell);
-                }
-            }
-        }
+                cell.className = `table-circle w-20 h-20 rounded-full flex flex-col items-center justify-center text-center p-2 shadow-sm border-2 cursor-pointer
+                    ${table.isMain ? 'bg-amber-400 border-amber-200' : 'bg-white border-slate-200'}
+                    ${table.r === 1 && table.c === 6 ? 'scale-125 z-10' : ''}
+                    ${selectedDeptGroup ? 'hover:bg-blue-50 border-dashed border-blue-300' : ''}
+                `;
+                if (table.c === 6) cell.classList.add('main-walkway');
 
-        // 彈窗邏輯
-        function openModal(id, currentLabel) {
-            editingId = id;
-            document.getElementById('edit-input').value = currentLabel;
-            document.getElementById('edit-modal').classList.remove('hidden');
-            setTimeout(() => document.getElementById('edit-input').focus(), 100);
-        }
+                cell.onclick = () => assignToTable(table.id);
 
-        function closeModal() {
-            document.getElementById('edit-modal').classList.add('hidden');
-            editingId = null;
-        }
-
-        function saveTable() {
-            const newLabel = document.getElementById('edit-input').value;
-            const tableIndex = tables.findIndex(t => t.id === editingId);
-            if (tableIndex > -1) {
-                tables[tableIndex].label = newLabel || `第 ${tables[tableIndex].r}-${tables[tableIndex].c} 桌`;
-            }
-            closeModal();
-            renderGrid();
-        }
-
-        function addTable(r, c) {
-            tables.push({ id: `new-${Date.now()}`, label: '新桌位', r, c, isMain: false });
-            isAddMode = false;
-            document.getElementById('status-tip').classList.add('hidden');
-            renderGrid();
-        }
-
-        document.getElementById('add-btn').onclick = () => {
-            isAddMode = !isAddMode;
-            document.getElementById('status-tip').classList.toggle('hidden', !isAddMode);
-            renderGrid();
-        };
-
-        renderGrid();
-    </script>
-</body>
-</html>
+                let contentHtml = `<span class="text-[9px] opacity-40">${table.r}-${table.c}</span>`;
+                
+                // 顯示已分配單位
+                if (table.assigned.length > 0) {
+                    contentHtml += `<div class="text-[10px] font
