@@ -3,80 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>尾牙排座系統 - V4 動態管理版</title>
+    <title>尾牙排座系統 - V5 視覺強化版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
     <style>
-        .grid-cell { width: 55px; height: 55px; }
-        .walkway-bg { background-color: #f1f5f9; } /* 窄化走道色 */
-        .canvas-container { 
-            display: grid; 
-            grid-template-columns: repeat(20, 55px);
-            gap: 6px;
-            padding: 20px;
-        }
-        .dragging { opacity: 0.5; transform: scale(1.1); }
-        .drop-target { border: 2px solid #3b82f6 !important; background-color: #eff6ff !important; }
+        .grid-cell { width: 65px; height: 65px; }
+        .walkway-bg { background-color: #f8fafc; border: 1px solid #e2e8f0; }
+        .canvas-container { display: grid; grid-template-columns: repeat(20, 65px); gap: 8px; padding: 25px; }
+        .dept-tag { font-size: 9px; line-height: 1; margin-bottom: 1px; }
+        .over-capacity { animation: pulse-red 2s infinite; border: 3px solid #ef4444 !important; }
+        @keyframes pulse-red { 0%, 100% { box-shadow: 0 0 0 0px rgba(239, 68, 68, 0.7); } 50% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); } }
     </style>
 </head>
-<body class="bg-slate-50 font-sans min-h-screen flex select-none">
+<body class="bg-slate-50 font-sans min-h-screen flex select-none text-slate-800">
 
     <div class="w-80 bg-white shadow-2xl h-screen sticky top-0 p-6 flex flex-col border-r z-50">
-        <h2 class="text-xl font-bold mb-4 text-slate-800">尾牙配置系統</h2>
+        <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
+            <span class="bg-blue-600 text-white p-1 rounded">尾牙</span> 排座系統
+        </h2>
         
-        <div class="grid grid-cols-2 gap-2 mb-6">
-            <div class="bg-blue-50 p-2 rounded-lg text-center border border-blue-100">
-                <div class="text-[10px] text-blue-500 font-bold uppercase">一般桌</div>
-                <div id="count-normal" class="text-xl font-black text-blue-700">0</div>
-            </div>
-            <div class="bg-amber-50 p-2 rounded-lg text-center border border-amber-100">
-                <div class="text-[10px] text-amber-500 font-bold uppercase">主桌</div>
-                <div id="count-main" class="text-xl font-black text-amber-700">0</div>
-            </div>
-        </div>
-
         <div class="space-y-2 mb-6">
-            <p class="text-xs text-slate-400 font-bold">1. 選擇類型 (點擊空白格放置)</p>
+            <p class="text-xs text-slate-400 font-bold uppercase tracking-wider">1. 選擇類型</p>
             <div class="flex gap-2">
-                <button id="mode-normal" onclick="setMode('normal')" class="flex-1 py-2 rounded bg-blue-600 text-white text-sm font-bold shadow-md">一般桌</button>
-                <button id="mode-main" onclick="setMode('main')" class="flex-1 py-2 rounded bg-white border border-slate-200 text-slate-600 text-sm font-bold">主桌</button>
+                <button id="mode-normal" onclick="setMode('normal')" class="flex-1 py-2 rounded bg-blue-600 text-white text-sm font-bold shadow-md">一般桌 (10人)</button>
+                <button id="mode-main" onclick="setMode('main')" class="flex-1 py-2 rounded bg-white border border-slate-200 text-slate-600 text-sm font-bold">主桌 (12人)</button>
             </div>
         </div>
 
         <div class="border-t pt-4 mb-4">
-            <p class="text-xs text-slate-400 font-bold mb-2">2. 匯入名單</p>
+            <p class="text-xs text-slate-400 font-bold mb-2 uppercase tracking-wider">2. 匯入名單</p>
             <input type="file" id="excel-upload" accept=".xlsx, .xls" class="block w-full text-xs text-slate-400 file:mr-3 file:py-1 file:px-3 file:rounded-full file:border-0 file:bg-slate-100 cursor-pointer"/>
         </div>
 
         <div id="dept-area" class="flex-1 overflow-y-auto hidden">
-            <h3 class="font-bold text-slate-700 text-sm mb-3">待分配單位</h3>
+            <h3 class="font-bold text-slate-700 text-sm mb-3">單位與組別</h3>
             <div id="dept-list" class="space-y-1"></div>
         </div>
         
-        <p class="text-[10px] text-slate-400 mt-4 leading-relaxed">
-            💡 操作提示：<br>
-            • 單擊空格：放置桌子<br>
-            • 拖曳桌子：移動或與他桌交換<br>
-            • 雙擊桌子：刪除桌子
-        </p>
+        <div class="mt-auto bg-slate-50 p-3 rounded-lg text-[10px] text-slate-500">
+            • 雙擊桌子：刪除桌位<br>
+            • 拖曳桌子：移動或交換<br>
+            • 單擊已排桌子：管理分配
+        </div>
     </div>
 
-    <div class="flex-1 overflow-auto bg-slate-200/30">
+    <div class="flex-1 overflow-auto bg-slate-100">
         <div class="min-w-max p-10">
-            <div class="w-[500px] h-12 bg-slate-800 text-white flex items-center justify-center mx-auto mb-16 rounded-b-2xl shadow-xl font-bold tracking-[1.5em]">STAGE 舞台</div>
-            <div id="canvas" class="canvas-container mx-auto bg-white rounded-2xl shadow-sm border border-slate-200"></div>
+            <div class="w-[600px] h-12 bg-slate-900 text-white flex items-center justify-center mx-auto mb-16 rounded-b-3xl shadow-xl font-bold tracking-[1.5em]">STAGE 舞台</div>
+            <div id="canvas" class="canvas-container mx-auto bg-white rounded-3xl shadow-sm border border-slate-200"></div>
+        </div>
+    </div>
+
+    <div id="color-picker-modal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-[100]">
+        <div class="bg-white p-6 rounded-2xl shadow-2xl w-80 text-center">
+            <h3 class="font-bold mb-4">選擇此桌的代表顏色</h3>
+            <div id="color-options" class="grid grid-cols-1 gap-2"></div>
         </div>
     </div>
 
     <script>
         const COLS = 20;
         const ROWS = 15;
-        const WALKWAY_COL = 11; // 窄化走道至一排
+        const WALKWAY_COL = 11;
         let currentMode = 'normal';
-        let tables = JSON.parse(localStorage.getItem('v4_tables')) || [];
-        let deptStats = {}; // { '單位': { count: 0, groups: { '組別': count } } }
+        let tables = JSON.parse(localStorage.getItem('v5_tables')) || [];
+        let deptStats = {}; 
+        let deptColors = {}; // 存放每個部門的顏色
         let selectedPath = { dept: null, group: null };
         let draggedTable = null;
+
+        const COLORS = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316"];
 
         function setMode(mode) {
             currentMode = mode;
@@ -84,13 +80,12 @@
             document.getElementById('mode-main').className = mode === 'main' ? 'flex-1 py-2 rounded bg-amber-500 text-white text-sm font-bold shadow-md' : 'flex-1 py-2 rounded bg-white border border-slate-200 text-slate-600 text-sm font-bold';
         }
 
-        // 自動排序並編號
         function sortAndNumberTables() {
-            // 先按 row 排序，再按 col 排序
             tables.sort((a, b) => a.r !== b.r ? a.r - b.r : a.c - b.c);
-            tables.forEach((t, index) => {
-                if (t.type === 'normal') t.displayId = index + 1;
-                else t.displayId = '主';
+            let nIdx = 1, mIdx = 1;
+            tables.forEach(t => {
+                if (t.type === 'main') { t.displayId = `M${mIdx++}`; t.capacity = 12; }
+                else { t.displayId = nIdx++; t.capacity = 10; }
             });
         }
 
@@ -99,105 +94,67 @@
             const canvas = document.getElementById('canvas');
             canvas.innerHTML = '';
             
-            let normalCount = 0;
-            let mainCount = 0;
-
             for (let r = 1; r <= ROWS; r++) {
                 for (let c = 1; c <= COLS; c++) {
                     const cell = document.createElement('div');
                     const table = tables.find(t => t.r === r && t.c === c);
-
                     cell.className = `grid-cell rounded-full flex items-center justify-center relative border border-slate-50 `;
                     if (c === WALKWAY_COL) cell.classList.add('walkway-bg');
 
                     if (table) {
-                        const isMain = table.type === 'main';
-                        if (isMain) mainCount++; else normalCount++;
+                        const totalPeople = (table.assigned || []).reduce((s, a) => s + a.count, 0);
+                        const isOver = totalPeople > table.capacity;
                         
                         const tableEl = document.createElement('div');
                         tableEl.draggable = true;
-                        tableEl.className = `w-11 h-11 rounded-full shadow-md flex items-center justify-center text-[10px] font-black cursor-move transition-transform active:scale-95 
-                            ${isMain ? 'bg-amber-400 text-amber-900 ring-2 ring-amber-100' : 'bg-blue-500 text-white'}`;
-                        tableEl.innerText = table.displayId;
-
-                        // 拖拉事件
-                        tableEl.ondragstart = (e) => { draggedTable = table; e.target.classList.add('dragging'); };
-                        tableEl.ondragend = (e) => { e.target.classList.remove('dragging'); draggedTable = null; renderCanvas(); };
+                        // 背景顏色：若無指定顏色則用預設，主桌有金邊
+                        const bgColor = table.themeColor || (table.type === 'main' ? '#fbbf24' : '#3b82f6');
                         
-                        // 雙擊刪除
-                        tableEl.ondblclick = (e) => {
-                            e.stopPropagation();
-                            if (confirm(`確定要刪除這張桌子嗎？`)) {
-                                tables = tables.filter(t => t !== table);
-                                renderCanvas();
-                            }
-                        };
+                        tableEl.className = `w-14 h-14 rounded-full shadow-lg flex flex-col items-center justify-center text-white cursor-move transition-all overflow-hidden ${isOver ? 'over-capacity' : ''}`;
+                        tableEl.style.backgroundColor = bgColor;
+                        if(table.type === 'main') tableEl.style.boxShadow = "0 0 0 3px #fef3c7";
 
-                        // 分配點擊
-                        tableEl.onclick = (e) => {
-                            e.stopPropagation();
-                            if (selectedPath.dept) assignToTable(table);
-                        };
+                        // 桌子內容：顯示部門與人數
+                        let content = `<div class="text-[9px] font-black opacity-80 mb-0.5 leading-none">${table.displayId}</div>`;
+                        if (table.assigned && table.assigned.length > 0) {
+                            table.assigned.forEach(a => {
+                                content += `<div class="dept-tag font-bold truncate px-1 w-full text-center">${a.dept.substring(0,2)}${a.count}</div>`;
+                            });
+                        } else {
+                            content += `<div class="text-[8px] opacity-60">空</div>`;
+                        }
+
+                        tableEl.innerHTML = content;
+                        
+                        tableEl.ondragstart = (e) => { draggedTable = table; e.target.classList.add('dragging'); };
+                        tableEl.ondragend = (e) => { e.target.classList.remove('dragging'); renderCanvas(); };
+                        tableEl.ondblclick = (e) => { e.stopPropagation(); if (confirm(`刪除桌號 ${table.displayId}？`)) { tables = tables.filter(t => t !== table); renderCanvas(); }};
+                        tableEl.onclick = (e) => { e.stopPropagation(); if (selectedPath.dept) assignToTable(table); else manageTable(table); };
 
                         cell.appendChild(tableEl);
                     } else {
-                        cell.onclick = () => {
-                            tables.push({ r, c, type: currentMode, assigned: [] });
-                            renderCanvas();
-                        };
+                        cell.onclick = () => { tables.push({ r, c, type: currentMode, assigned: [], themeColor: null }); renderCanvas(); };
                     }
 
-                    // 放置目標事件
                     cell.ondragover = (e) => e.preventDefault();
-                    cell.ondragenter = (e) => cell.classList.add('drop-target');
-                    cell.ondragleave = (e) => cell.classList.remove('drop-target');
-                    cell.ondrop = (e) => {
-                        cell.classList.remove('drop-target');
-                        if (!draggedTable) return;
-                        
-                        const targetTable = tables.find(t => t.r === r && t.c === c);
-                        if (targetTable) {
-                            // 交換位置
-                            const tempR = draggedTable.r;
-                            const tempC = draggedTable.c;
-                            draggedTable.r = r;
-                            draggedTable.c = c;
-                            targetTable.r = tempR;
-                            targetTable.c = tempC;
-                        } else {
-                            // 移動到空位
-                            draggedTable.r = r;
-                            draggedTable.c = c;
-                        }
-                        renderCanvas();
-                    };
+                    cell.ondrop = (e) => { if (!draggedTable) return; const t = tables.find(t => t.r === r && t.c === c); if (t) { [draggedTable.r, draggedTable.c, t.r, t.c] = [r, c, draggedTable.r, draggedTable.c]; } else { draggedTable.r = r; draggedTable.c = c; } renderCanvas(); };
 
                     canvas.appendChild(cell);
                 }
             }
-            document.getElementById('count-normal').innerText = normalCount;
-            document.getElementById('count-main').innerText = mainCount;
-            localStorage.setItem('v4_tables', JSON.stringify(tables));
+            localStorage.setItem('v5_tables', JSON.stringify(tables));
         }
-
-        // Excel 兩階段處理
-        document.getElementById('excel-upload').addEventListener('change', function(e) {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                const data = new Uint8Array(event.target.result);
-                const workbook = XLSX.read(data, { type: 'array' });
-                const raw = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-                processExcel(raw);
-            };
-            reader.readAsArrayBuffer(e.target.files[0]);
-        });
 
         function processExcel(raw) {
             deptStats = {};
+            let cIdx = 0;
             raw.forEach(item => {
-                const d = item['單位'];
-                const g = item['組別'] || '其他';
-                if (!deptStats[d]) deptStats[d] = { total: 0, groups: {} };
+                const d = item['單位'], g = item['組別'] || '其他';
+                if (!deptStats[d]) {
+                    deptStats[d] = { total: 0, groups: {} };
+                    deptColors[d] = COLORS[cIdx % COLORS.length];
+                    cIdx++;
+                }
                 if (!deptStats[d].groups[g]) deptStats[d].groups[g] = 0;
                 deptStats[d].total++;
                 deptStats[d].groups[g]++;
@@ -209,60 +166,79 @@
         function renderSidebar() {
             const list = document.getElementById('dept-list');
             list.innerHTML = '';
-            
-            Object.keys(deptStats).forEach(deptName => {
-                const dept = deptStats[deptName];
-                const isDeptSelected = selectedPath.dept === deptName;
-                
-                const deptDiv = document.createElement('div');
-                deptDiv.className = `p-2 rounded cursor-pointer border mb-1 transition-all ${isDeptSelected ? 'bg-slate-800 text-white' : 'bg-white hover:border-blue-300'}`;
-                deptDiv.innerHTML = `<div class="flex justify-between text-xs font-bold"><span>${deptName}</span><span>${dept.total}人</span></div>`;
-                
-                deptDiv.onclick = () => {
-                    selectedPath.dept = isDeptSelected ? null : deptName;
-                    selectedPath.group = null;
-                    renderSidebar();
-                };
-
-                list.appendChild(deptDiv);
-
-                // 如果選中單位，顯示組別
-                if (isDeptSelected) {
-                    const groupContainer = document.createElement('div');
-                    groupContainer.className = "ml-4 mb-2 border-l-2 border-slate-200 pl-2 space-y-1";
-                    Object.keys(dept.groups).forEach(groupName => {
-                        const count = dept.groups[groupName];
-                        const isGroupSelected = selectedPath.group === groupName;
+            Object.keys(deptStats).forEach(dName => {
+                const d = deptStats[dName];
+                const isSel = selectedPath.dept === dName;
+                const div = document.createElement('div');
+                div.className = `p-2 rounded cursor-pointer border mb-1 text-xs font-bold transition-all flex justify-between items-center`;
+                div.style.borderLeft = `4px solid ${deptColors[dName]}`;
+                div.style.backgroundColor = isSel ? '#1e293b' : 'white';
+                div.style.color = isSel ? 'white' : '#1e293b';
+                div.innerHTML = `<span>${dName}</span><span>${d.total}人</span>`;
+                div.onclick = () => { selectedPath.dept = isSel ? null : dName; selectedPath.group = null; renderSidebar(); };
+                list.appendChild(div);
+                if (isSel) {
+                    const gBox = document.createElement('div');
+                    gBox.className = "ml-4 mb-2 border-l-2 pl-2 space-y-1";
+                    Object.keys(d.groups).forEach(gName => {
+                        const isGSel = selectedPath.group === gName;
                         const gDiv = document.createElement('div');
-                        gDiv.className = `p-1.5 text-[10px] rounded border cursor-pointer ${isGroupSelected ? 'bg-blue-500 text-white' : 'bg-white text-slate-600'}`;
-                        gDiv.innerText = `${groupName} (${count}人)`;
-                        gDiv.onclick = (e) => {
-                            e.stopPropagation();
-                            selectedPath.group = isGroupSelected ? null : groupName;
-                            renderSidebar();
-                        };
-                        groupContainer.appendChild(gDiv);
+                        gDiv.className = `p-1 text-[10px] rounded cursor-pointer ${isGSel ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-600'}`;
+                        gDiv.innerText = `${gName} (${d.groups[gName]}人)`;
+                        gDiv.onclick = (e) => { e.stopPropagation(); selectedPath.group = isGSel ? null : gName; renderSidebar(); };
+                        gBox.appendChild(gDiv);
                     });
-                    list.appendChild(groupContainer);
+                    list.appendChild(gBox);
                 }
             });
         }
 
         function assignToTable(table) {
-            const dept = selectedPath.dept;
-            const group = selectedPath.group;
-            if (!dept) return;
-
-            const label = group ? `${dept}-${group}` : dept;
-            const count = prompt(`分配 [${label}] 到桌號 ${table.displayId}，請輸入人數：`, group ? deptStats[dept].groups[group] : deptStats[dept].total);
-            
+            const count = prompt(`分配 [${selectedPath.dept}${selectedPath.group ? '-'+selectedPath.group : ''}] 到 ${table.displayId}，請輸入人數：`, selectedPath.group ? deptStats[selectedPath.dept].groups[selectedPath.group] : deptStats[selectedPath.dept].total);
             if (count > 0) {
-                if (!table.assigned) table.assigned = [];
-                table.assigned.push({ label, count: parseInt(count) });
-                renderCanvas();
-                alert(`已分配 ${count} 人`);
+                table.assigned.push({ dept: selectedPath.dept, count: parseInt(count) });
+                // 檢查是否需要選擇顏色 (當桌子有多個部門時)
+                const uniqueDepts = [...new Set(table.assigned.map(a => a.dept))];
+                if (uniqueDepts.length > 1) {
+                    showColorPicker(table, uniqueDepts);
+                } else {
+                    table.themeColor = deptColors[uniqueDepts[0]];
+                    renderCanvas();
+                }
             }
         }
+
+        function showColorPicker(table, depts) {
+            const modal = document.getElementById('color-picker-modal');
+            const box = document.getElementById('color-options');
+            box.innerHTML = '';
+            depts.forEach(d => {
+                const btn = document.createElement('button');
+                btn.className = "w-full py-2 rounded text-white text-xs font-bold mb-1";
+                btn.style.backgroundColor = deptColors[d];
+                btn.innerText = `使用 ${d} 的顏色`;
+                btn.onclick = () => { table.themeColor = deptColors[d]; modal.classList.add('hidden'); renderCanvas(); };
+                box.appendChild(btn);
+            });
+            modal.classList.remove('hidden');
+        }
+
+        function manageTable(table) {
+            if (table.assigned.length > 0 && confirm(`清空桌號 ${table.displayId} 的分配嗎？`)) {
+                table.assigned = [];
+                table.themeColor = null;
+                renderCanvas();
+            }
+        }
+
+        document.getElementById('excel-upload').addEventListener('change', e => {
+            const reader = new FileReader();
+            reader.onload = ev => {
+                const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
+                processExcel(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]));
+            };
+            reader.readAsArrayBuffer(e.target.files[0]);
+        });
 
         renderCanvas();
     </script>
