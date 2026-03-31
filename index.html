@@ -3,35 +3,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>尾牙排座系統 - 場地配置</title>
+    <title>尾牙排座系統 - 編輯模式</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        .main-walkway { margin-right: 60px; }
+        .main-walkway { margin-right: 80px; }
         .grid-container {
             display: grid;
-            grid-template-columns: repeat(12, minmax(60px, 1fr));
-            gap: 1rem;
+            grid-template-columns: repeat(12, minmax(80px, 1fr));
+            gap: 1.5rem;
             justify-content: center;
         }
     </style>
 </head>
-<body class="bg-gray-100 p-8 font-sans min-h-screen relative">
+<body class="bg-slate-50 p-8 font-sans min-h-screen pb-32">
 
-    <h1 class="text-2xl font-bold mb-6 text-gray-800 text-center">尾牙排座系統 - 場地配置預覽</h1>
+    <h1 class="text-3xl font-extrabold mb-2 text-slate-800 text-center">尾牙排座系統</h1>
+    <p class="text-center text-slate-500 mb-8">點擊桌子可編輯名稱，左下角按鈕可新增桌位</p>
     
-    <div class="w-full h-12 bg-red-600 text-white flex items-center justify-center mb-12 rounded shadow-lg max-w-5xl mx-auto">
+    <div class="w-full h-16 bg-rose-600 text-white flex items-center justify-center mb-16 rounded-lg shadow-xl max-w-6xl mx-auto font-bold text-xl tracking-widest">
         STAGE 舞台
     </div>
 
-    <div id="grid-container" class="grid-container max-w-6xl mx-auto">
-        </div>
+    <div id="grid-container" class="grid-container max-w-7xl mx-auto"></div>
 
-    <div class="fixed bottom-10 left-10 flex flex-col items-start gap-3">
-        <div id="status-tip" class="hidden bg-black text-white text-xs p-2 rounded animate-bounce">
-            請點選灰色虛線區域新增桌子
+    <div id="edit-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-xl shadow-2xl w-80">
+            <h3 class="text-lg font-bold mb-4">編輯桌位資訊</h3>
+            <input type="text" id="edit-input" class="w-full border-2 border-blue-100 p-2 rounded mb-4 focus:border-blue-500 outline-none" placeholder="輸入單位或桌號">
+            <div class="flex justify-end gap-2">
+                <button onclick="closeModal()" class="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded">取消</button>
+                <button onclick="saveTable()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">儲存</button>
+            </div>
         </div>
-        <button id="add-btn" class="p-4 rounded-full shadow-2xl bg-white text-blue-600 hover:bg-blue-50 border border-gray-200 transition-all">
-            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+    </div>
+
+    <div class="fixed bottom-10 left-10 flex flex-col items-start gap-4">
+        <div id="status-tip" class="hidden bg-blue-600 text-white text-sm px-4 py-2 rounded-full shadow-lg animate-bounce">
+            ✨ 請點選虛線區域新增桌子
+        </div>
+        <button id="add-btn" class="group p-5 rounded-full shadow-2xl bg-white text-blue-600 hover:bg-blue-600 hover:text-white border-2 border-blue-50 transition-all active:scale-95">
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
         </button>
     </div>
 
@@ -40,15 +51,20 @@
         const COLS = 12;
         const MAIN_WALKWAY_AFTER = 6;
         let isAddMode = false;
+        let editingId = null;
         
-        // 初始桌位資料 (主桌在第一排中間)
-        let tables = [];
-        for (let r = 1; r <= ROWS; r++) {
-            for (let c = 1; c <= COLS; c++) {
-                if (r === 1 && (c === 6 || c === 7)) {
-                    if (c === 6) tables.push({ id: 'Main', r, c, isMain: true });
-                } else {
-                    tables.push({ id: `${r}-${c}`, r, c, isMain: false });
+        // 初始資料存放在本地瀏覽器或預設
+        let tables = JSON.parse(localStorage.getItem('tailwan_tables')) || [];
+
+        if (tables.length === 0) {
+            // 如果沒資料，生成預設 12x9
+            for (let r = 1; r <= ROWS; r++) {
+                for (let c = 1; c <= COLS; c++) {
+                    if (r === 1 && (c === 6 || c === 7)) {
+                        if (c === 6) tables.push({ id: 'main-1', label: '主桌 1', r, c, isMain: true });
+                    } else {
+                        tables.push({ id: `t-${r}-${c}`, label: `第 ${r}-${c} 桌`, r, c, isMain: false });
+                    }
                 }
             }
         }
@@ -56,37 +72,63 @@
         function renderGrid() {
             const container = document.getElementById('grid-container');
             container.innerHTML = '';
+            localStorage.setItem('tailwan_tables', JSON.stringify(tables));
 
             for (let r = 1; r <= ROWS; r++) {
                 for (let c = 1; c <= COLS; c++) {
                     const table = tables.find(t => (t.r === r && t.c === c));
                     const cell = document.createElement('div');
+                    cell.style.width = '80px';
+                    cell.style.height = '80px';
+                    cell.className = `relative rounded-full flex flex-col items-center justify-center transition-all cursor-pointer text-center p-2 `;
                     
-                    // 基礎樣式
-                    cell.className = `relative h-20 w-20 rounded-full flex items-center justify-center transition-all cursor-pointer `;
                     if (c === MAIN_WALKWAY_AFTER) cell.classList.add('main-walkway');
 
                     if (table) {
                         if (table.isMain) {
-                            cell.className += "bg-yellow-500 scale-125 z-10 shadow-lg text-white font-bold";
-                            cell.innerText = "主桌";
+                            cell.className += "bg-amber-400 scale-125 z-10 shadow-lg ring-4 ring-amber-200 text-amber-900 font-black";
                         } else {
-                            cell.className += "bg-blue-500 shadow-md text-white text-xs font-bold";
-                            cell.innerText = `桌 ${r}-${c}`;
+                            cell.className += "bg-white shadow-md border border-slate-200 hover:border-blue-400 hover:shadow-blue-100 text-slate-700 font-bold";
                         }
+                        cell.innerHTML = `<span class="text-[10px] opacity-60 block mb-1">R${r}-C${c}</span><span class="text-xs break-words leading-tight">${table.label}</span>`;
+                        cell.onclick = () => openModal(table.id, table.label);
                     } else {
-                        cell.className += `border-2 border-dashed border-gray-300 hover:bg-gray-200`;
-                        if (isAddMode) cell.classList.add('animate-pulse');
-                        cell.onclick = () => addTable(r, c);
+                        cell.className += `border-2 border-dashed border-slate-200 hover:bg-white hover:border-blue-300`;
+                        if (isAddMode) {
+                            cell.classList.add('animate-pulse', 'bg-blue-50');
+                            cell.onclick = () => addTable(r, c);
+                        }
                     }
                     container.appendChild(cell);
                 }
             }
         }
 
+        // 彈窗邏輯
+        function openModal(id, currentLabel) {
+            editingId = id;
+            document.getElementById('edit-input').value = currentLabel;
+            document.getElementById('edit-modal').classList.remove('hidden');
+            setTimeout(() => document.getElementById('edit-input').focus(), 100);
+        }
+
+        function closeModal() {
+            document.getElementById('edit-modal').classList.add('hidden');
+            editingId = null;
+        }
+
+        function saveTable() {
+            const newLabel = document.getElementById('edit-input').value;
+            const tableIndex = tables.findIndex(t => t.id === editingId);
+            if (tableIndex > -1) {
+                tables[tableIndex].label = newLabel || `第 ${tables[tableIndex].r}-${tables[tableIndex].c} 桌`;
+            }
+            closeModal();
+            renderGrid();
+        }
+
         function addTable(r, c) {
-            if (!isAddMode) return;
-            tables.push({ id: `New-${r}-${c}`, r, c, isMain: false });
+            tables.push({ id: `new-${Date.now()}`, label: '新桌位', r, c, isMain: false });
             isAddMode = false;
             document.getElementById('status-tip').classList.add('hidden');
             renderGrid();
