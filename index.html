@@ -3,21 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>尾牙排座系統 - V7.1 修正版</title>
+    <title>尾牙排座系統 - V8 數據連動版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
     <style>
         .grid-cell { width: 70px; height: 70px; }
         .walkway-bg { background-color: #f1f5f9; border: 1px solid #cbd5e1; }
         .canvas-container { display: grid; grid-template-columns: repeat(20, 70px); gap: 10px; padding: 30px; }
-        
-        /* 邊框狀態邏輯 */
         .status-full { border: 3px solid currentColor !important; } 
-        .status-partial { border: 3px dashed #f97316 !important; box-shadow: inset 0 0 10px rgba(249, 115, 22, 0.2); } 
+        .status-partial { border: 3px dashed #f97316 !important; } 
         .status-over { animation: pulse-red 1s infinite; border: 4px solid #ef4444 !important; } 
-
-        @keyframes pulse-red { 0%, 100% { transform: scale(1); } 50% { transform: scale(0.95); opacity: 0.8; } }
-        .dragging { opacity: 0.3; }
+        @keyframes pulse-red { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .modal-bg { background-color: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
     </style>
 </head>
 <body class="bg-slate-50 font-sans min-h-screen flex select-none text-slate-800" oncontextmenu="return false;">
@@ -27,29 +24,25 @@
             <span class="bg-indigo-600 text-white p-1 rounded text-sm">PRO</span> 排座管理
         </h2>
         
-        <div class="flex gap-2 mb-6">
-            <button id="mode-normal" onclick="setMode('normal')" class="flex-1 py-2 rounded bg-indigo-600 text-white text-xs font-bold shadow-md">一般桌 (10)</button>
-            <button id="mode-main" onclick="setMode('main')" class="flex-1 py-2 rounded bg-white border border-slate-200 text-slate-600 text-xs font-bold">主桌 (12)</button>
+        <div class="flex gap-2 mb-4">
+            <button onclick="setMode('normal')" id="mode-normal" class="flex-1 py-2 rounded bg-indigo-600 text-white text-xs font-bold shadow-md">一般桌(10)</button>
+            <button onclick="setMode('main')" id="mode-main" class="flex-1 py-2 rounded bg-white border text-slate-600 text-xs font-bold">主桌(12)</button>
         </div>
 
-        <div class="border-t pt-4 mb-4">
-            <p class="text-[10px] text-slate-400 font-bold mb-2 uppercase">Step 1. 匯入 EXCEL 名單</p>
-            <input type="file" id="excel-upload" accept=".xlsx, .xls" class="block w-full text-xs text-slate-400 file:mr-3 file:py-1 file:px-3 file:rounded-full file:border-0 file:bg-indigo-50 file:text-indigo-600 cursor-pointer font-bold"/>
+        <div class="space-y-2 mb-4">
+            <button onclick="openDataModal()" class="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                開啟名單 / 新增資料
+            </button>
+            <input type="file" id="excel-upload" class="hidden" accept=".xlsx, .xls"/>
         </div>
 
-        <div id="dept-area" class="flex-1 overflow-y-auto hidden">
-            <div class="flex justify-between items-center mb-3 pt-2 border-t">
-                <h3 class="font-bold text-slate-700 text-sm">Step 2. 點選單位分配</h3>
-                <button id="lock-btn" onclick="toggleLock()" class="text-[9px] px-2 py-1 rounded bg-slate-200 hover:bg-slate-300 font-bold transition-all">🔓 解鎖中</button>
+        <div id="dept-area" class="flex-1 overflow-y-auto border-t pt-4">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="font-bold text-slate-700 text-xs uppercase tracking-wider">單位待排統計</h3>
+                <span id="veg-total-info" class="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">素食: 0</span>
             </div>
             <div id="dept-list" class="space-y-1"></div>
-        </div>
-        
-        <div class="mt-auto bg-slate-100 p-3 rounded-lg text-[10px] text-slate-500 space-y-1 border border-slate-200">
-            <p>• <span class="text-indigo-600 font-bold">左鍵點空格</span>：新增桌子</p>
-            <p>• <span class="text-indigo-600 font-bold">左鍵點桌子</span>：管理人數/分配</p>
-            <p>• <span class="text-orange-600 font-bold">橘色虛線</span>：該桌人數未滿</p>
-            <p>• <span class="text-red-600 font-bold">右鍵點桌子</span>：刪除該張桌子</p>
         </div>
     </div>
 
@@ -60,290 +53,263 @@
         </div>
     </div>
 
-    <div id="manage-modal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-[100] backdrop-blur-sm">
-        <div class="bg-white p-6 rounded-2xl shadow-2xl w-96 border border-white/20">
+    <div id="data-modal" class="hidden fixed inset-0 modal-bg flex items-center justify-center z-[100]">
+        <div class="bg-white rounded-2xl shadow-2xl w-[90%] h-[80%] flex flex-col p-6">
             <div class="flex justify-between items-center mb-4">
-                <h3 class="font-black text-lg" id="modal-title">管理桌位</h3>
-                <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 text-xl">✕</button>
+                <div>
+                    <h3 class="text-xl font-black text-slate-800">名單數據管理</h3>
+                    <p class="text-xs text-slate-400">您可以直接修改表格或點擊「新增一列」</p>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="document.getElementById('excel-upload').click()" class="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg font-bold text-sm">匯入 Excel</button>
+                    <button onclick="addRow()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold text-sm">＋ 新增單筆</button>
+                    <button onclick="closeDataModal()" class="px-4 py-2 bg-slate-200 text-slate-600 rounded-lg font-bold text-sm">關閉</button>
+                </div>
             </div>
-            <div id="modal-content" class="space-y-3 mb-6 max-h-[300px] overflow-y-auto"></div>
-            <button onclick="closeModal()" class="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200">確認儲存</button>
+            <div class="flex-1 overflow-auto border rounded-xl">
+                <table class="w-full text-left text-sm border-collapse">
+                    <thead class="bg-slate-50 sticky top-0 shadow-sm">
+                        <tr>
+                            <th class="p-3 border-b">部門/單位</th>
+                            <th class="p-3 border-b">組別</th>
+                            <th class="p-3 border-b">姓名</th>
+                            <th class="p-3 border-b">飲食 (葷/素)</th>
+                            <th class="p-3 border-b w-20">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="data-table-body"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="manage-modal" class="hidden fixed inset-0 modal-bg flex items-center justify-center z-[100]">
+        <div class="bg-white p-6 rounded-2xl shadow-2xl w-96">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-black" id="modal-title">管理桌位</h3>
+                <button onclick="closeManageModal()" class="text-slate-400">✕</button>
+            </div>
+            <div id="modal-content" class="space-y-3 mb-6 max-h-60 overflow-y-auto"></div>
+            <button onclick="closeManageModal()" class="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold">確認</button>
         </div>
     </div>
 
     <script>
-        const COLS = 20, ROWS = 15, WALKWAY_COL = 11;
+        let rawData = JSON.parse(localStorage.getItem('v8_raw_data')) || []; // 名單數據庫
+        let tables = JSON.parse(localStorage.getItem('v8_tables')) || [];
         let currentMode = 'normal';
-        let tables = JSON.parse(localStorage.getItem('v7_tables_fixed')) || [];
-        let deptStats = {}; 
-        let deptColors = {}; 
-        let selectedPath = { dept: null, group: null };
-        let isLocked = false; 
-        let draggedTable = null;
-        let currentEditingTable = null;
-        
+        let deptColors = {};
         const COLORS = ["#4f46e5", "#e11d48", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316"];
 
-        function setMode(m) {
-            currentMode = m;
-            document.getElementById('mode-normal').className = `flex-1 py-2 rounded text-xs font-bold ${m==='normal'?'bg-indigo-600 text-white shadow-md':'bg-white border text-slate-600'}`;
-            document.getElementById('mode-main').className = `flex-1 py-2 rounded text-xs font-bold ${m==='main'?'bg-amber-500 text-white shadow-md':'bg-white border text-slate-600'}`;
-        }
-
-        function toggleLock() { 
-            isLocked = !isLocked; 
-            const btn = document.getElementById('lock-btn');
-            btn.innerText = isLocked ? '🔒 已鎖定部門' : '🔓 解鎖中';
-            btn.className = `text-[9px] px-2 py-1 rounded font-bold transition-all ${isLocked ? 'bg-amber-500 text-white shadow-inner' : 'bg-slate-200 text-slate-600'}`;
-            renderSidebar();
-        }
-
-        function sortTables() {
-            tables.sort((a, b) => a.r !== b.r ? a.r - b.r : a.c - b.c);
-            let n = 1, m = 1;
-            tables.forEach(t => {
-                t.displayId = t.type === 'main' ? `M${m++}` : n++;
-                t.capacity = t.type === 'main' ? 12 : 10;
+        // --- 名單管理功能 ---
+        function openDataModal() { document.getElementById('data-modal').classList.remove('hidden'); renderDataTable(); }
+        function closeDataModal() { document.getElementById('data-modal').classList.add('hidden'); renderCanvas(); }
+        
+        function renderDataTable() {
+            const tbody = document.getElementById('data-table-body');
+            tbody.innerHTML = '';
+            rawData.forEach((item, index) => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 border-b transition-colors";
+                tr.innerHTML = `
+                    <td class="p-2"><input class="w-full bg-transparent p-1 border rounded" value="${item.dept}" onchange="updateData(${index}, 'dept', this.value)"></td>
+                    <td class="p-2"><input class="w-full bg-transparent p-1 border rounded" value="${item.group || ''}" onchange="updateData(${index}, 'group', this.value)"></td>
+                    <td class="p-2"><input class="w-full bg-transparent p-1 border rounded" value="${item.name || ''}" onchange="updateData(${index}, 'name', this.value)"></td>
+                    <td class="p-2">
+                        <select class="w-full bg-transparent p-1 border rounded" onchange="updateData(${index}, 'diet', this.value)">
+                            <option value="葷" ${item.diet==='葷'?'selected':''}>葷</option>
+                            <option value="素" ${item.diet==='素'?'selected':''}>素</option>
+                        </select>
+                    </td>
+                    <td class="p-2"><button onclick="deleteRow(${index})" class="text-red-400 hover:text-red-600">刪除</button></td>
+                `;
+                tbody.appendChild(tr);
             });
         }
 
+        function addRow() { rawData.unshift({ dept: '新單位', group: '', name: '', diet: '葷' }); renderDataTable(); save(); }
+        function updateData(idx, key, val) { rawData[idx][key] = val; save(); }
+        function deleteRow(idx) { if(confirm('確定刪除此筆資料？')){ rawData.splice(idx, 1); renderDataTable(); save(); } }
+
+        // --- 核心計算與畫布 ---
+        function getStats() {
+            let stats = {};
+            rawData.forEach(d => {
+                if(!stats[d.dept]) stats[d.dept] = { total: 0, veg: 0 };
+                stats[d.dept].total++;
+                if(d.diet === '素') stats[d.dept].veg++;
+            });
+            return stats;
+        }
+
+        function getRemain(dName) {
+            const stats = getStats();
+            const total = stats[dName]?.total || 0;
+            let assigned = 0;
+            tables.forEach(t => (t.assigned || []).forEach(a => { if(a.dept === dName) assigned += a.count; }));
+            return total - assigned;
+        }
+
         function renderCanvas() {
-            sortTables();
+            tables.sort((a, b) => a.r !== b.r ? a.r - b.r : a.c - b.c);
+            let n = 1, m = 1;
+            tables.forEach(t => { t.displayId = t.type === 'main' ? `M${m++}` : n++; t.capacity = t.type === 'main' ? 12 : 10; });
+
             const canvas = document.getElementById('canvas');
             canvas.innerHTML = '';
-            
+            const stats = getStats();
+
             for (let r = 1; r <= ROWS; r++) {
                 for (let c = 1; c <= COLS; c++) {
                     const cell = document.createElement('div');
                     cell.className = `grid-cell rounded-full flex items-center justify-center relative ${c === WALKWAY_COL ? 'walkway-bg' : ''}`;
-                    
                     const table = tables.find(t => t.r === r && t.c === c);
+
                     if (table) {
-                        const total = (table.assigned || []).reduce((s, a) => s + a.count, 0);
-                        let statusClass = "";
-                        if (total > table.capacity) statusClass = 'status-over';
-                        else if (total === table.capacity) statusClass = 'status-full';
-                        else if (total > 0) statusClass = 'status-partial';
+                        const totalPeople = (table.assigned || []).reduce((s, a) => s + a.count, 0);
+                        const vegCount = (table.assigned || []).reduce((s, a) => s + (a.veg || 0), 0);
                         
+                        let statusClass = totalPeople > table.capacity ? 'status-over' : (totalPeople === table.capacity ? 'status-full' : (totalPeople > 0 ? 'status-partial' : ''));
                         const tableEl = document.createElement('div');
                         tableEl.draggable = true;
-                        tableEl.className = `w-14 h-14 rounded-full shadow-lg flex flex-col items-center justify-center text-white transition-all overflow-hidden ${statusClass}`;
+                        tableEl.className = `w-14 h-14 rounded-full shadow-lg flex flex-col items-center justify-center text-white text-center transition-all ${statusClass}`;
                         tableEl.style.backgroundColor = table.themeColor || (table.type === 'main' ? '#fbbf24' : '#6366f1');
-
-                        tableEl.innerHTML = `<div class="text-[9px] font-black opacity-80">${table.displayId}</div>`;
+                        
+                        tableEl.innerHTML = `<div class="text-[9px] font-black">${table.displayId}</div>`;
                         (table.assigned || []).slice(0,2).forEach(a => {
-                            tableEl.innerHTML += `<div class="text-[8px] font-bold truncate w-full px-1 text-center">${a.dept.substring(0,2)}${a.count}</div>`;
+                            tableEl.innerHTML += `<div class="text-[8px] font-bold leading-tight">${a.dept.substring(0,2)}${a.count}</div>`;
                         });
+                        if(vegCount > 0) tableEl.innerHTML += `<div class="text-[7px] bg-green-500/50 px-1 rounded">素:${vegCount}</div>`;
 
                         tableEl.onclick = (e) => {
                             e.stopPropagation();
-                            if (selectedPath.dept) assignToTable(table);
+                            if(selectedDept) assignToTable(table);
                             else openManageModal(table);
                         };
-                        
-                        tableEl.oncontextmenu = (e) => {
-                            e.preventDefault();
-                            if(confirm(`確定刪除桌號 ${table.displayId} 嗎？`)) {
-                                tables = tables.filter(t => t !== table);
-                                renderCanvas();
-                            }
-                        };
-
-                        tableEl.ondragstart = () => { draggedTable = table; tableEl.classList.add('dragging'); };
+                        tableEl.oncontextmenu = (e) => { e.preventDefault(); if(confirm(`刪除桌號 ${table.displayId}？`)) { tables = tables.filter(t => t !== table); renderCanvas(); } };
+                        tableEl.ondragstart = () => { draggedTable = table; tableEl.style.opacity = "0.3"; };
                         tableEl.ondragend = () => { draggedTable = null; renderCanvas(); };
 
                         cell.appendChild(tableEl);
                     } else {
                         cell.className += " border border-dashed border-slate-200 hover:bg-indigo-50 cursor-pointer";
-                        cell.onclick = () => {
-                            tables.push({ r, c, type: currentMode, assigned: [], themeColor: null });
-                            renderCanvas();
-                        };
+                        cell.onclick = () => { tables.push({ r, c, type: currentMode, assigned: [], themeColor: null }); renderCanvas(); };
                         cell.ondragover = (e) => e.preventDefault();
-                        cell.ondrop = (e) => {
-                            if (!draggedTable) return;
-                            const target = tables.find(t => t.r === r && t.c === c);
-                            if (!target) { draggedTable.r = r; draggedTable.c = c; }
-                            renderCanvas();
-                        };
+                        cell.ondrop = (e) => { if(draggedTable) { draggedTable.r = r; draggedTable.c = c; renderCanvas(); } };
                     }
-                    
-                    // 針對有桌子的格點做 Drop (交換)
-                    if (table) {
-                        cell.ondragover = (e) => e.preventDefault();
-                        cell.ondrop = (e) => {
-                            if (!draggedTable || draggedTable === table) return;
-                            const oldR = draggedTable.r, oldC = draggedTable.c;
-                            draggedTable.r = table.r; draggedTable.c = table.c;
-                            table.r = oldR; table.c = oldC;
-                            renderCanvas();
-                        };
-                    }
-
                     canvas.appendChild(cell);
                 }
             }
-            localStorage.setItem('v7_tables_fixed', JSON.stringify(tables));
-            if (Object.keys(deptStats).length > 0) renderSidebar();
+            renderSidebar();
+            save();
         }
 
-        function getRemain(dName, gName = null) {
-            if (!deptStats[dName]) return 0;
-            const totalInPool = gName ? deptStats[dName].groups[gName] : deptStats[dName].total;
-            let assigned = 0;
-            tables.forEach(t => (t.assigned || []).forEach(a => {
-                if (a.dept === dName && (!gName || a.group === gName)) assigned += a.count;
-            }));
-            return totalInPool - assigned;
-        }
-
+        let selectedDept = null;
         function renderSidebar() {
             const list = document.getElementById('dept-list');
             list.innerHTML = '';
-            
-            Object.keys(deptStats).forEach(dName => {
-                const remain = getRemain(dName);
-                const isSelected = selectedPath.dept === dName;
-                
-                const div = document.createElement('div');
-                div.className = `p-2 rounded cursor-pointer border mb-1 text-xs font-bold flex justify-between transition-all ${isSelected ? 'bg-indigo-900 text-white border-indigo-900 scale-105 shadow-md' : 'bg-white hover:border-indigo-300'}`;
-                div.style.borderLeft = `4px solid ${deptColors[dName]}`;
-                div.innerHTML = `<span>${dName}</span><span>${remain}人</span>`;
-                
-                div.onclick = () => {
-                    if (isLocked) return;
-                    selectedPath.dept = isSelected ? null : dName;
-                    selectedPath.group = null;
-                    renderSidebar();
-                };
-                list.appendChild(div);
+            const stats = getStats();
+            let totalVeg = 0;
+            Object.values(stats).forEach(s => totalVeg += s.veg);
+            document.getElementById('veg-total-info').innerText = `總素食: ${totalVeg}`;
 
-                if (isSelected) {
-                    const gBox = document.createElement('div');
-                    gBox.className = "ml-4 space-y-1 mb-2 border-l-2 border-indigo-100 pl-2";
-                    Object.keys(deptStats[dName].groups).forEach(gName => {
-                        const gRemain = getRemain(dName, gName);
-                        const isGSelected = selectedPath.group === gName;
-                        const gDiv = document.createElement('div');
-                        gDiv.className = `p-1.5 text-[10px] rounded border transition-all ${isGSelected ? 'bg-indigo-500 text-white' : 'bg-slate-50 text-slate-600'}`;
-                        gDiv.innerHTML = `<div class="flex justify-between"><span>${gName}</span><span>${gRemain}人</span></div>`;
-                        gDiv.onclick = (e) => {
-                            e.stopPropagation();
-                            selectedPath.group = isGSelected ? null : gName;
-                            renderSidebar();
-                        };
-                        gBox.appendChild(gDiv);
-                    });
-                    list.appendChild(gBox);
-                }
+            Object.keys(stats).forEach((dName, idx) => {
+                if(!deptColors[dName]) deptColors[dName] = COLORS[idx % COLORS.length];
+                const remain = getRemain(dName);
+                const isSel = selectedDept === dName;
+                const div = document.createElement('div');
+                div.className = `p-2 rounded cursor-pointer border mb-1 text-xs font-bold flex justify-between items-center transition-all ${isSel ? 'bg-slate-800 text-white scale-105 shadow-md' : 'bg-white hover:border-indigo-300'}`;
+                div.style.borderLeft = `4px solid ${deptColors[dName]}`;
+                // 如果人數為負數，顯示紅色
+                const remainColor = remain < 0 ? 'text-red-500' : (isSel ? 'text-white' : 'text-slate-400');
+                div.innerHTML = `<span>${dName} <span class="text-[9px] opacity-60">(素:${stats[dName].veg})</span></span><span class="${remainColor}">${remain}人</span>`;
+                div.onclick = () => { selectedDept = isSel ? null : dName; renderSidebar(); };
+                list.appendChild(div);
             });
         }
 
         function assignToTable(table) {
-            const d = selectedPath.dept, g = selectedPath.group;
-            const remain = getRemain(d, g);
-            if (remain <= 0) { alert("該單位/組別已全部分配完畢！"); return; }
-
-            const input = prompt(`分配 [${d}${g?'-'+g:''}] 到 ${table.displayId}\n目前該單位剩餘: ${remain} 人\n請輸入分配人數：`, remain);
-            const count = parseInt(input);
+            const remain = getRemain(selectedDept);
+            const stats = getStats()[selectedDept];
+            const inputCount = prompt(`分配 [${selectedDept}] 到 ${table.displayId}，請輸入人數：`, Math.max(0, remain));
+            const count = parseInt(inputCount);
             
-            if (isNaN(count) || count <= 0) return;
-            if (count > remain) { alert(`超量分配！剩餘人數只有 ${remain} 人。`); return; }
+            if(count > 0) {
+                // 詢問素食人數
+                const vegInput = prompt(`這 ${count} 人中有幾位素食者？`, "0");
+                const vegCount = parseInt(vegInput) || 0;
+                
+                table.assigned.push({ dept: selectedDept, count, veg: vegCount });
+                if(!table.themeColor) table.themeColor = deptColors[selectedDept];
+                selectedDept = null;
+                renderCanvas();
+            }
+        }
 
-            table.assigned.push({ dept: d, group: g, count });
-            if (!table.themeColor) table.themeColor = deptColors[d];
-            
-            // 分配完後自動清除選擇
-            selectedPath = { dept: null, group: null };
-            renderCanvas();
+        // --- 通用功能 ---
+        const ROWS = 15, COLS = 20, WALKWAY_COL = 11;
+        let draggedTable = null;
+
+        function setMode(m) { 
+            currentMode = m; 
+            document.getElementById('mode-normal').className = m==='normal' ? 'flex-1 py-2 rounded bg-indigo-600 text-white text-xs font-bold shadow-md' : 'flex-1 py-2 rounded bg-white border text-slate-600 text-xs font-bold';
+            document.getElementById('mode-main').className = m==='main' ? 'flex-1 py-2 rounded bg-amber-500 text-white text-xs font-bold shadow-md' : 'flex-1 py-2 rounded bg-white border text-slate-600 text-xs font-bold';
         }
 
         function openManageModal(table) {
             currentEditingTable = table;
-            const modal = document.getElementById('manage-modal');
             const content = document.getElementById('modal-content');
             content.innerHTML = '';
-            
+            document.getElementById('modal-title').innerText = `管理 ${table.displayId} 桌`;
             table.assigned.forEach((a, i) => {
-                const currentMax = getRemain(a.dept, a.group) + a.count;
                 const div = document.createElement('div');
-                div.className = "flex items-center gap-2 bg-slate-50 p-2 rounded border border-slate-200 mb-2";
+                div.className = "flex flex-col gap-1 p-2 bg-slate-50 border rounded text-xs";
                 div.innerHTML = `
-                    <div class="flex-1">
-                        <div class="text-[10px] font-bold text-indigo-600">${a.dept}</div>
-                        <div class="text-[9px] text-slate-400">${a.group || '一般'}</div>
+                    <div class="font-bold text-indigo-600">${a.dept}</div>
+                    <div class="flex items-center gap-2">
+                        <span>總數:</span><input type="number" value="${a.count}" class="w-12 border p-1" onchange="updateAssign(${i}, 'count', this.value)">
+                        <span>素食:</span><input type="number" value="${a.veg||0}" class="w-12 border p-1" onchange="updateAssign(${i}, 'veg', this.value)">
+                        <button onclick="removeAssign(${i})" class="ml-auto text-red-400">✕</button>
                     </div>
-                    <div class="flex items-center gap-1">
-                        <span class="text-[10px] text-slate-400">人數:</span>
-                        <input type="number" value="${a.count}" min="1" max="${currentMax}" 
-                            class="w-12 border rounded text-center text-xs font-bold py-1" 
-                            onchange="updateTableCount(${i}, this.value, ${currentMax})">
-                    </div>
-                    <button onclick="removeAssign(${i})" class="text-red-400 hover:text-red-600 p-1">✕</button>
                 `;
                 content.appendChild(div);
             });
-            modal.classList.remove('hidden');
+            document.getElementById('manage-modal').classList.remove('hidden');
+        }
+        function updateAssign(idx, key, val) { currentEditingTable.assigned[idx][key] = parseInt(val); }
+        function removeAssign(idx) { currentEditingTable.assigned.splice(idx,1); if(currentEditingTable.assigned.length===0) currentEditingTable.themeColor=null; openManageModal(currentEditingTable); }
+        function closeManageModal() { document.getElementById('manage-modal').classList.add('hidden'); renderCanvas(); }
+
+        function save() {
+            localStorage.setItem('v8_raw_data', JSON.stringify(rawData));
+            localStorage.setItem('v8_tables', JSON.stringify(tables));
         }
 
-        function updateTableCount(idx, val, max) {
-            const v = parseInt(val);
-            if (v > max) { alert(`不可超過剩餘總人數 ${max}`); renderCanvas(); openManageModal(currentEditingTable); return; }
-            if (v <= 0) return;
-            currentEditingTable.assigned[idx].count = v;
-        }
-
-        function removeAssign(idx) {
-            currentEditingTable.assigned.splice(idx, 1);
-            if(currentEditingTable.assigned.length === 0) currentEditingTable.themeColor = null;
-            openManageModal(currentEditingTable);
-        }
-
-        function closeModal() { document.getElementById('manage-modal').classList.add('hidden'); renderCanvas(); }
-
-        // --- EXCEL 修正讀取器 ---
+        // Excel 匯入
         document.getElementById('excel-upload').onchange = (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
             const reader = new FileReader();
             reader.onload = (ev) => {
-                try {
-                    const data = new Uint8Array(ev.target.result);
-                    const workbook = XLSX.read(data, {type:'array'});
-                    const raw = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+                const raw = XLSX.utils.sheet_to_json(XLSX.read(new Uint8Array(ev.target.result), {type:'array'}).Sheets[0]);
+                const newData = raw.map(item => {
+                    const dKey = Object.keys(item).find(k => k.includes('單位') || k.includes('部門'));
+                    const gKey = Object.keys(item).find(k => k.includes('組別') || k.includes('組'));
+                    const nKey = Object.keys(item).find(k => k.includes('姓名'));
+                    const vKey = Object.keys(item).find(k => k.includes('飲食') || k.includes('習慣') || k.includes('素'));
                     
-                    if (raw.length === 0) { alert("Excel 是空的！"); return; }
+                    let diet = '葷';
+                    const dietVal = String(item[vKey] || '');
+                    if(dietVal.includes('素')) diet = '素';
 
-                    deptStats = {}; let colorIdx = 0;
-                    raw.forEach(item => {
-                        // 智慧欄位偵測：抓取包含「單位」或「部門」字眼的欄位
-                        const dKey = Object.keys(item).find(k => k.includes('單位') || k.includes('部門'));
-                        const gKey = Object.keys(item).find(k => k.includes('組別') || k.includes('組'));
-                        
-                        const d = item[dKey] || "未知單位";
-                        const g = item[gKey] || "一般";
-                        
-                        if (!deptStats[d]) {
-                            deptStats[d] = { total: 0, groups: {} };
-                            deptColors[d] = COLORS[colorIdx % COLORS.length];
-                            colorIdx++;
-                        }
-                        if (!deptStats[d].groups[g]) deptStats[d].groups[g] = 0;
-                        deptStats[d].total++;
-                        deptStats[d].groups[g]++;
-                    });
-                    
-                    document.getElementById('dept-area').classList.remove('hidden');
-                    renderCanvas();
-                } catch (err) {
-                    console.error(err);
-                    alert("讀取 Excel 失敗，請檢查檔案格式！");
-                }
+                    return { dept: item[dKey] || '未知', group: item[gKey] || '', name: item[nKey] || '', diet: diet };
+                });
+                rawData = [...newData, ...rawData];
+                save();
+                renderDataTable();
+                renderSidebar();
             };
-            reader.readAsArrayBuffer(file);
+            reader.readAsArrayBuffer(e.target.files[0]);
         };
 
-        setMode('normal');
         renderCanvas();
     </script>
 </body>
