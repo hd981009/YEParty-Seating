@@ -2,23 +2,31 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <title>尾牙排座系統 V13.1 - 專業精簡版</title>
+    <title>尾牙排座系統 V13.2 - 視角優化版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
-        .grid-cell { width: 85px; height: 85px; }
-        .canvas-container { display: grid; grid-template-columns: repeat(19, 85px); gap: 12px; padding: 40px; }
+        /* 調整格子大小與間距，讓 19 欄更容易塞進螢幕 */
+        .grid-cell { width: 80px; height: 80px; }
+        .canvas-container { 
+            display: grid; 
+            grid-template-columns: repeat(19, 80px); 
+            gap: 8px; /* 縮小間距 */
+            padding: 40px; 
+        }
         .status-over { border: 4px solid #ef4444 !important; animation: pulse 1s infinite; }
         @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
         .veg-marker { position: absolute; bottom: -2px; right: -2px; background: #22c55e; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; items-center; justify-content: center; font-size: 12px; border: 2px solid white; font-weight: bold; }
         .table-id-tag { position: absolute; top: -10px; background: #334155; padding: 1px 8px; border-radius: 12px; font-size: 12px; color: white; z-index: 10; font-weight: bold; border: 1px solid white; }
         .modal-bg { background-color: rgba(0,0,0,0.7); backdrop-filter: blur(5px); }
+        /* 讓右側畫布區域可以獨立捲動 */
+        #scroll-wrapper { overflow: auto !important; height: 100vh; flex-grow: 1; position: relative; }
     </style>
 </head>
 <body class="bg-slate-100 font-sans min-h-screen flex text-slate-800 overflow-hidden" oncontextmenu="return false;">
 
-    <div class="w-96 bg-white shadow-2xl h-screen flex flex-col border-r z-50 p-5">
+    <div class="w-96 bg-white shadow-2xl h-screen flex flex-col border-r z-50 p-5 flex-shrink-0">
         <h1 class="text-2xl font-black text-indigo-600 mb-4">尾牙排座系統</h1>
 
         <div class="grid grid-cols-2 gap-2 mb-4">
@@ -39,7 +47,7 @@
         <div class="grid grid-cols-2 gap-2 mb-4">
             <button onclick="openDataModal()" class="py-2 bg-slate-800 text-white rounded-lg text-xs font-bold">名單/員編管理</button>
             <button onclick="exportImage()" class="py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold">匯出桌圖PNG</button>
-            <button onclick="exportProject()" class="py-2 border border-slate-300 rounded-lg text-[10px] font-bold">匯出專案(分享用)</button>
+            <button onclick="exportProject()" class="py-2 border border-slate-300 rounded-lg text-[10px] font-bold">匯出專案(分享)</button>
             <button onclick="document.getElementById('import-project').click()" class="py-2 border border-slate-300 rounded-lg text-[10px] font-bold">匯入專案</button>
             <input type="file" id="import-project" class="hidden" accept=".json" onchange="importProject(this)"/>
         </div>
@@ -50,8 +58,8 @@
         </div>
     </div>
 
-    <div id="capture-area" class="flex-1 overflow-auto bg-slate-200">
-        <div class="min-w-max p-12">
+    <div id="scroll-wrapper" class="bg-slate-200">
+        <div id="capture-area" class="min-w-max p-12">
             <div class="w-[800px] h-14 bg-slate-900 text-white flex items-center justify-center mx-auto mb-20 rounded-b-3xl font-bold text-2xl tracking-[2em] border-x-8 border-indigo-500 shadow-xl">舞台 STAGE</div>
             <div id="canvas" class="canvas-container mx-auto bg-white rounded-[40px] shadow-2xl border border-slate-300"></div>
         </div>
@@ -71,7 +79,7 @@
                     <button onclick="closeDataModal()" class="px-5 py-2 bg-slate-900 text-white rounded-xl font-bold">完成並儲存</button>
                 </div>
             </div>
-            <div class="flex-1 overflow-auto border rounded-2xl"><table class="w-full text-left"><thead class="bg-slate-100 sticky top-0"><tr><th class="p-4">單位</th><th class="p-4">組別</th><th class="p-4">員編</th><th class="p-4">姓名</th><th class="p-4">飲食</th><th class="p-4">刪除</th></tr></thead><tbody id="data-table-body" class="divide-y"></tbody></table></div>
+            <div class="flex-1 overflow-auto border rounded-2xl"><table class="w-full text-left"><thead class="bg-slate-100 sticky top-0"><tr><th class="p-4">單位</th><th class="p-4">組別</th><th class="p-4">員編</th><th class="p-4">姓名</th><th class="p-4">飲食</th><th class="p-4 text-center">刪除</th></tr></thead><tbody id="data-table-body" class="divide-y"></tbody></table></div>
         </div>
     </div>
 
@@ -87,6 +95,7 @@
         const ROWS = 12, COLS = 19, WALKWAY_COL = 10;
         let rawData = [], tables = [], deptAliases = {};
         let currentTableMode = 'normal', assignType = '葷', draggedTable = null;
+        let selectedDept = null;
 
         function init() {
             const saved = localStorage.getItem('tailor_v13_data');
@@ -97,7 +106,6 @@
             renderCanvas();
         }
 
-        // 計算邏輯
         function getStats() {
             let s = {};
             rawData.forEach(d => {
@@ -114,7 +122,6 @@
             return (type === '葷' ? stats.meat : stats.veg) - assigned;
         }
 
-        // 畫布渲染
         function renderCanvas() {
             tables.sort((a,b)=>a.r!==b.r?a.r-b.r:a.c-b.c);
             let n=1, m=1; tables.forEach(t=>{t.displayId=t.type==='main'?`M${m++}`:n++; t.capacity=t.type==='main'?12:10;});
@@ -131,12 +138,12 @@
                         const isVeg = (table.assigned||[]).some(a => a.type === '素');
                         const tableEl = document.createElement('div');
                         tableEl.draggable = true;
-                        tableEl.className = `w-[75px] h-[75px] rounded-full shadow-lg flex flex-col items-center justify-center text-white transition-all cursor-move relative ${total>table.capacity?'status-over':'border-2 border-slate-300'}`;
+                        tableEl.className = `w-[70px] h-[70px] rounded-full shadow-lg flex flex-col items-center justify-center text-white transition-all cursor-move relative ${total>table.capacity?'status-over':'border-2 border-slate-300'}`;
                         tableEl.style.backgroundColor = isVeg ? '#16a34a' : (table.type==='main'?'#f59e0b':'#4f46e5');
                         tableEl.innerHTML = `<div class="table-id-tag">${table.displayId}</div>`;
                         (table.assigned||[]).slice(0,2).forEach(a=>{
                             const alias = deptAliases[a.dept] || a.dept.substring(0,2);
-                            tableEl.innerHTML += `<div class="text-[13px] font-black leading-tight">${alias}:${a.count}</div>`;
+                            tableEl.innerHTML += `<div class="text-[12px] font-black leading-tight">${alias}:${a.count}</div>`;
                         });
                         if(isVeg) tableEl.innerHTML += `<div class="veg-marker">素</div>`;
                         tableEl.onclick=()=>{ if(selectedDept) assignToTable(table); else openManageModal(table); };
@@ -211,16 +218,18 @@
         function importProject(input) {
             const reader = new FileReader();
             reader.onload = (e) => {
-                const d = JSON.parse(e.target.result);
-                rawData = d.rawData; tables = d.tables; deptAliases = d.deptAliases;
-                renderCanvas(); alert('專案匯入成功！');
+                try {
+                    const d = JSON.parse(e.target.result);
+                    rawData = d.rawData; tables = d.tables; deptAliases = d.deptAliases;
+                    renderCanvas(); alert('專案匯入成功！');
+                } catch(err) { alert('檔案格式不正確'); }
             };
             reader.readAsText(input.files[0]);
         }
 
         function exportImage() {
             html2canvas(document.getElementById('capture-area'), { scale: 2 }).then(canvas => {
-                const a = document.createElement('a'); a.download = `桌圖.png`; a.href = canvas.toDataURL(); a.click();
+                const a = document.createElement('a'); a.download = `尾牙桌圖_${new Date().toLocaleDateString()}.png`; a.href = canvas.toDataURL(); a.click();
             });
         }
 
@@ -229,8 +238,8 @@
             document.getElementById('modal-title').innerHTML = `管理桌位 ${t.displayId} ${isVeg?'<span class="text-green-600">(素)</span>':''}`;
             const c = document.getElementById('modal-content'); c.innerHTML = '';
             t.assigned.forEach((a,i)=>{
-                const d = document.createElement('div'); d.className="p-3 bg-slate-100 rounded-xl flex justify-between";
-                d.innerHTML = `<b>${a.dept}</b> <div>人數:<input type="number" value="${a.count}" class="w-12 mx-2 border rounded" onchange="t.assigned[${i}].count=parseInt(this.value)"> <button onclick="t.assigned.splice(${i},1);openManageModal(t)" class="text-red-500">✕</button></div>`;
+                const d = document.createElement('div'); d.className="p-3 bg-slate-100 rounded-xl flex justify-between items-center";
+                d.innerHTML = `<span class="font-bold">${a.dept}</span> <div>人數:<input type="number" value="${a.count}" class="w-12 mx-2 border rounded" onchange="t.assigned[${i}].count=parseInt(this.value)"> <button onclick="t.assigned.splice(${i},1);openManageModal(t)" class="text-red-500">✕</button></div>`;
                 c.appendChild(d);
             });
             document.getElementById('manage-modal').classList.remove('hidden');
@@ -257,7 +266,8 @@
             const isVeg = (t.assigned||[]).some(a=>a.type==='素'), isMeat = (t.assigned||[]).some(a=>a.type==='葷');
             if((assignType==='素'&&isMeat) || (assignType==='葷'&&isVeg)) return alert("此桌飲食類型不同，請勿混坐！");
             const rem = getRemain(selectedDept, assignType);
-            const count = parseInt(prompt(`分配 ${selectedDept} 到第 ${t.displayId} 桌，剩餘 ${rem} 人：`, rem));
+            const countStr = prompt(`分配 ${selectedDept} 到第 ${t.displayId} 桌，剩餘 ${rem} 人：`, rem);
+            const count = parseInt(countStr);
             if(count > 0) {
                 const ex = t.assigned.find(a=>a.dept===selectedDept && a.type===assignType);
                 if(ex) ex.count += count; else t.assigned.push({dept:selectedDept, count, type:assignType});
@@ -269,7 +279,7 @@
             reader.onload = (ev) => {
                 const rows = XLSX.utils.sheet_to_json(XLSX.read(new Uint8Array(ev.target.result), {type:'array'}).Sheets[XLSX.read(new Uint8Array(ev.target.result), {type:'array'}).SheetNames[0]], {header:1});
                 for(let i=1; i<rows.length; i++){
-                    const r = rows[i]; if(r.length<4) continue;
+                    const r = rows[i]; if(!r || r.length<4) continue;
                     rawData.push({ dept: String(r[0]||'未分類'), group: String(r[1]||''), id: String(r[2]||''), name: String(r[3]||''), diet: String(r[4]||'葷') });
                 }
                 save(); renderDataTable(); renderCanvas();
