@@ -2,36 +2,36 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <title>尾牙排座系統 V13.2 - 視角優化版</title>
+    <title>尾牙排座系統 V13.3 - 智慧導引版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
-        /* 調整格子大小與間距，讓 19 欄更容易塞進螢幕 */
-        .grid-cell { width: 80px; height: 80px; }
-        .canvas-container { 
-            display: grid; 
-            grid-template-columns: repeat(19, 80px); 
-            gap: 8px; /* 縮小間距 */
-            padding: 40px; 
-        }
+        .grid-cell { width: 85px; height: 85px; }
+        .canvas-container { display: grid; grid-template-columns: repeat(19, 85px); gap: 10px; padding: 40px; }
         .status-over { border: 4px solid #ef4444 !important; animation: pulse 1s infinite; }
         @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
-        .veg-marker { position: absolute; bottom: -2px; right: -2px; background: #22c55e; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; items-center; justify-content: center; font-size: 12px; border: 2px solid white; font-weight: bold; }
-        .table-id-tag { position: absolute; top: -10px; background: #334155; padding: 1px 8px; border-radius: 12px; font-size: 12px; color: white; z-index: 10; font-weight: bold; border: 1px solid white; }
+        
+        /* 素桌標記：改用強烈綠色邊框與圓標，內部保留部門顏色 */
+        .veg-table-style { border: 5px solid #22c55e !important; box-shadow: 0 0 15px rgba(34, 197, 94, 0.4); }
+        .veg-marker { position: absolute; bottom: -4px; right: -4px; background: #22c55e; color: white; border-radius: 50%; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; font-size: 14px; border: 2px solid white; font-weight: bold; z-index: 20; }
+        
+        .table-id-tag { position: absolute; top: -12px; background: #1e293b; padding: 2px 10px; border-radius: 14px; font-size: 13px; color: white; z-index: 10; font-weight: bold; border: 2px solid white; }
         .modal-bg { background-color: rgba(0,0,0,0.7); backdrop-filter: blur(5px); }
-        /* 讓右側畫布區域可以獨立捲動 */
         #scroll-wrapper { overflow: auto !important; height: 100vh; flex-grow: 1; position: relative; }
+        
+        /* 未排完部門的特效 */
+        .dept-remaining { border: 2px solid #6366f1 !important; box-shadow: 0 0 10px rgba(99, 102, 241, 0.2); }
     </style>
 </head>
 <body class="bg-slate-100 font-sans min-h-screen flex text-slate-800 overflow-hidden" oncontextmenu="return false;">
 
     <div class="w-96 bg-white shadow-2xl h-screen flex flex-col border-r z-50 p-5 flex-shrink-0">
-        <h1 class="text-2xl font-black text-indigo-600 mb-4">尾牙排座系統</h1>
+        <h1 class="text-2xl font-black text-indigo-600 mb-4">尾牙排座 V13.3</h1>
 
         <div class="grid grid-cols-2 gap-2 mb-4">
-            <button onclick="setMode('normal')" id="mode-normal" class="py-3 rounded-xl bg-indigo-600 text-white font-bold shadow-lg text-sm">一般桌</button>
-            <button onclick="setMode('main')" id="mode-main" class="py-3 rounded-xl bg-white border-2 border-slate-200 text-slate-600 font-bold text-sm">主桌</button>
+            <button onclick="setMode('normal')" id="mode-normal" class="py-3 rounded-xl bg-indigo-600 text-white font-bold shadow-lg text-sm">一般桌 (10人)</button>
+            <button onclick="setMode('main')" id="mode-main" class="py-3 rounded-xl bg-white border-2 border-slate-200 text-slate-600 font-bold text-sm">主桌 (12人)</button>
         </div>
 
         <div class="bg-slate-100 p-1 rounded-2xl flex mb-4">
@@ -40,27 +40,27 @@
         </div>
 
         <div id="veg-global-stats" class="hidden mb-4 p-4 bg-green-600 text-white rounded-2xl">
-            <div class="text-xs font-bold opacity-80 uppercase">全公司素食剩餘</div>
+            <div class="text-xs font-bold opacity-80">全公司素食剩餘</div>
             <div class="text-3xl font-black"><span id="global-veg-count">0</span> <span class="text-sm font-normal">人</span></div>
         </div>
 
         <div class="grid grid-cols-2 gap-2 mb-4">
             <button onclick="openDataModal()" class="py-2 bg-slate-800 text-white rounded-lg text-xs font-bold">名單/員編管理</button>
             <button onclick="exportImage()" class="py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold">匯出桌圖PNG</button>
-            <button onclick="exportProject()" class="py-2 border border-slate-300 rounded-lg text-[10px] font-bold">匯出專案(分享)</button>
+            <button onclick="exportProject()" class="py-2 border border-slate-300 rounded-lg text-[10px] font-bold">匯出專案</button>
             <button onclick="document.getElementById('import-project').click()" class="py-2 border border-slate-300 rounded-lg text-[10px] font-bold">匯入專案</button>
             <input type="file" id="import-project" class="hidden" accept=".json" onchange="importProject(this)"/>
         </div>
 
         <div class="flex-1 overflow-y-auto border-t pt-4">
-            <h3 class="font-black text-slate-400 text-xs tracking-widest mb-3 uppercase">待排人數 (即時計算)</h3>
-            <div id="dept-list" class="space-y-2"></div>
+            <h3 class="font-black text-slate-400 text-[10px] tracking-widest mb-3 uppercase">待排清單 (自動排序)</h3>
+            <div id="dept-list" class="space-y-2 pb-10"></div>
         </div>
     </div>
 
     <div id="scroll-wrapper" class="bg-slate-200">
         <div id="capture-area" class="min-w-max p-12">
-            <div class="w-[800px] h-14 bg-slate-900 text-white flex items-center justify-center mx-auto mb-20 rounded-b-3xl font-bold text-2xl tracking-[2em] border-x-8 border-indigo-500 shadow-xl">舞台 STAGE</div>
+            <div class="w-[800px] h-14 bg-slate-900 text-white flex items-center justify-center mx-auto mb-20 rounded-b-3xl font-bold text-2xl tracking-[2em] border-x-8 border-indigo-500 shadow-xl">STAGE 舞台</div>
             <div id="canvas" class="canvas-container mx-auto bg-white rounded-[40px] shadow-2xl border border-slate-300"></div>
         </div>
     </div>
@@ -68,10 +68,7 @@
     <div id="data-modal" class="hidden fixed inset-0 modal-bg flex items-center justify-center z-[100]">
         <div class="bg-white rounded-3xl shadow-2xl w-[90%] h-[85%] flex flex-col p-8">
             <div class="flex justify-between items-start mb-6">
-                <div>
-                    <h3 class="text-2xl font-black">名單數據中心</h3>
-                    <p class="text-sm text-red-500 font-bold hidden" id="id-error">⚠️ 員編重複！請檢查下方紅色欄位</p>
-                </div>
+                <div><h3 class="text-2xl font-black">名單數據中心</h3><p class="text-sm text-red-500 font-bold hidden" id="id-error">⚠️ 員編重複！</p></div>
                 <div class="flex gap-2">
                     <button onclick="document.getElementById('excel-upload').click()" class="px-5 py-2 bg-indigo-600 text-white rounded-xl font-bold">Excel 匯入</button>
                     <input type="file" id="excel-upload" class="hidden" accept=".xlsx, .xls"/>
@@ -87,15 +84,15 @@
         <div class="bg-white p-8 rounded-3xl shadow-2xl w-96">
             <h3 class="text-xl font-black mb-4 border-b pb-2" id="modal-title"></h3>
             <div id="modal-content" class="space-y-3 mb-6 max-h-80 overflow-y-auto"></div>
-            <button onclick="closeManageModal()" class="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black">儲存修改</button>
+            <button onclick="saveAndCloseManage()" class="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-lg">儲存修改</button>
         </div>
     </div>
 
     <script>
         const ROWS = 12, COLS = 19, WALKWAY_COL = 10;
-        let rawData = [], tables = [], deptAliases = {};
-        let currentTableMode = 'normal', assignType = '葷', draggedTable = null;
-        let selectedDept = null;
+        let rawData = [], tables = [], deptAliases = {}, deptColors = {};
+        let currentTableMode = 'normal', assignType = '葷', draggedTable = null, selectedDept = null, currentEditingTable = null;
+        const PALETTE = ["#4f46e5", "#e11d48", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316", "#14b8a6", "#f43f5e"];
 
         function init() {
             const saved = localStorage.getItem('tailor_v13_data');
@@ -108,8 +105,11 @@
 
         function getStats() {
             let s = {};
-            rawData.forEach(d => {
-                if(!s[d.dept]) s[d.dept] = { meat: 0, veg: 0 };
+            rawData.forEach((d, i) => {
+                if(!s[d.dept]) {
+                    s[d.dept] = { meat: 0, veg: 0 };
+                    if(!deptColors[d.dept]) deptColors[d.dept] = PALETTE[Object.keys(deptColors).length % PALETTE.length];
+                }
                 if(String(d.diet).includes('素')) s[d.dept].veg++; else s[d.dept].meat++;
             });
             return s;
@@ -136,18 +136,24 @@
                     if(table){
                         const total = (table.assigned||[]).reduce((s,a)=>s+a.count,0);
                         const isVeg = (table.assigned||[]).some(a => a.type === '素');
+                        const mainDept = table.assigned.length > 0 ? table.assigned[0].dept : null;
+                        
                         const tableEl = document.createElement('div');
                         tableEl.draggable = true;
-                        tableEl.className = `w-[70px] h-[70px] rounded-full shadow-lg flex flex-col items-center justify-center text-white transition-all cursor-move relative ${total>table.capacity?'status-over':'border-2 border-slate-300'}`;
-                        tableEl.style.backgroundColor = isVeg ? '#16a34a' : (table.type==='main'?'#f59e0b':'#4f46e5');
+                        tableEl.className = `w-[75px] h-[75px] rounded-full shadow-lg flex flex-col items-center justify-center text-white transition-all cursor-move relative ${total>table.capacity?'status-over':''} ${isVeg?'veg-table-style':'border-2 border-slate-300'}`;
+                        
+                        // 使用該桌第一個部門的顏色
+                        tableEl.style.backgroundColor = mainDept ? deptColors[mainDept] : '#cbd5e1';
                         tableEl.innerHTML = `<div class="table-id-tag">${table.displayId}</div>`;
+                        
                         (table.assigned||[]).slice(0,2).forEach(a=>{
                             const alias = deptAliases[a.dept] || a.dept.substring(0,2);
-                            tableEl.innerHTML += `<div class="text-[12px] font-black leading-tight">${alias}:${a.count}</div>`;
+                            tableEl.innerHTML += `<div class="text-[13px] font-black leading-tight drop-shadow-md">${alias}:${a.count}</div>`;
                         });
+                        
                         if(isVeg) tableEl.innerHTML += `<div class="veg-marker">素</div>`;
                         tableEl.onclick=()=>{ if(selectedDept) assignToTable(table); else openManageModal(table); };
-                        tableEl.oncontextmenu=(e)=>{ e.preventDefault(); if(confirm('刪除？')){tables=tables.filter(t=>t!==table); renderCanvas();}};
+                        tableEl.oncontextmenu=(e)=>{ e.preventDefault(); if(confirm('刪除此桌？')){tables=tables.filter(t=>t!==table); renderCanvas();}};
                         tableEl.ondragstart=()=>{ draggedTable = table; tableEl.style.opacity="0.4"; };
                         tableEl.ondragend=()=>{ draggedTable = null; renderCanvas(); };
                         cell.appendChild(tableEl);
@@ -172,11 +178,27 @@
         function renderSidebar() {
             const list = document.getElementById('dept-list'), s = getStats();
             list.innerHTML = '';
-            Object.keys(s).forEach(d => {
+            
+            // 排序邏輯：剩餘人數 > 0 的排在上面
+            const sortedDepts = Object.keys(s).sort((a, b) => {
+                const remA = getRemain(a, assignType);
+                const remB = getRemain(b, assignType);
+                if (remA > 0 && remB === 0) return -1;
+                if (remA === 0 && remB > 0) return 1;
+                return 0;
+            });
+
+            sortedDepts.forEach(d => {
                 const rem = getRemain(d, assignType);
+                const isSel = selectedDept===d;
                 const div = document.createElement('div');
-                div.className = `p-3 rounded-xl border-2 cursor-pointer transition-all ${selectedDept===d?'bg-slate-900 text-white border-slate-900 shadow-lg scale-105':'bg-white border-slate-100'}`;
-                div.innerHTML = `<div class="flex justify-between font-bold text-sm"><span>${d}</span><span>${rem}人</span></div><div class="text-[10px] opacity-50">簡稱: ${deptAliases[d]||d.substring(0,2)}</div>`;
+                // 狀態樣式：未排完顯示深色邊框，排完變淡
+                const statusClass = rem > 0 ? 'dept-remaining border-indigo-200 shadow-sm' : 'opacity-40 bg-slate-50 border-transparent';
+                
+                div.className = `p-3 rounded-xl border-2 cursor-pointer transition-all ${isSel?'bg-slate-900 text-white border-slate-900 shadow-xl scale-105':statusClass}`;
+                div.style.borderLeft = `6px solid ${deptColors[d]}`;
+                div.innerHTML = `<div class="flex justify-between font-bold text-sm"><span>${d}</span><span>${rem}人</span></div><div class="text-[10px] opacity-60">簡稱: ${deptAliases[d]||d.substring(0,2)}</div>`;
+                
                 div.onclick=()=>{ if(rem>0) {selectedDept=(selectedDept===d?null:d); renderSidebar();}};
                 div.oncontextmenu=(e)=>{ e.preventDefault(); const a=prompt(`「${d}」簡稱:`, deptAliases[d]||d.substring(0,2)); if(a) deptAliases[d]=a; renderCanvas(); };
                 list.appendChild(div);
@@ -188,6 +210,48 @@
             document.getElementById('global-veg-count').innerText = total;
         }
 
+        // 管理彈窗與人數修改
+        function openManageModal(t){
+            currentEditingTable = t;
+            const isVeg = (t.assigned||[]).some(a=>a.type==='素');
+            document.getElementById('modal-title').innerHTML = `管理桌位 ${t.displayId} ${isVeg?'<span class="text-green-600">(素)</span>':''}`;
+            const c = document.getElementById('modal-content'); c.innerHTML = '';
+            
+            t.assigned.forEach((a,i)=>{
+                const d = document.createElement('div'); d.className="p-3 bg-slate-100 rounded-xl flex justify-between items-center";
+                // 加入人數輸入框，綁定 onchange 事件
+                d.innerHTML = `
+                    <span class="font-bold text-sm" style="color:${deptColors[a.dept]}">${a.dept} (${a.type})</span> 
+                    <div class="flex items-center gap-2">
+                        人數:<input type="number" value="${a.count}" min="1" 
+                                    class="w-16 p-1 text-center border rounded font-bold" 
+                                    onchange="updateAssignedCount(${i}, this.value)"> 
+                        <button onclick="removeAssigned(${i})" class="text-red-500 font-bold ml-2">✕</button>
+                    </div>`;
+                c.appendChild(d);
+            });
+            document.getElementById('manage-modal').classList.remove('hidden');
+        }
+
+        function updateAssignedCount(idx, val) {
+            if(currentEditingTable && val > 0) {
+                currentEditingTable.assigned[idx].count = parseInt(val);
+            }
+        }
+
+        function removeAssigned(idx) {
+            if(currentEditingTable) {
+                currentEditingTable.assigned.splice(idx, 1);
+                openManageModal(currentEditingTable);
+            }
+        }
+
+        function saveAndCloseManage() {
+            document.getElementById('manage-modal').classList.add('hidden');
+            renderCanvas();
+        }
+
+        // 基礎功能
         function renderDataTable() {
             const tbody = document.getElementById('data-table-body'); tbody.innerHTML = '';
             let hasDup = false;
@@ -195,14 +259,7 @@
                 const isDup = rawData.some((v, i) => v.id && v.id === item.id && i !== index);
                 if(isDup) hasDup = true;
                 const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td class="p-2"><input class="w-full border-b" value="${item.dept}" onchange="rawData[${index}].dept=this.value;renderDataTable()"></td>
-                    <td class="p-2"><input class="w-full border-b text-slate-400" value="${item.group||''}" onchange="rawData[${index}].group=this.value"></td>
-                    <td class="p-2"><input class="w-full border-b font-bold ${isDup?'text-red-600 bg-red-50':''}" value="${item.id}" onchange="rawData[${index}].id=this.value;renderDataTable()"></td>
-                    <td class="p-2"><input class="w-full border-b" value="${item.name}" onchange="rawData[${index}].name=this.value"></td>
-                    <td class="p-2"><input class="w-full border-b" value="${item.diet}" onchange="rawData[${index}].diet=this.value;renderDataTable()"></td>
-                    <td class="p-2 text-center"><button onclick="rawData.splice(${index},1);renderDataTable()" class="text-red-400">✕</button></td>
-                `;
+                tr.innerHTML = `<td class="p-2"><input class="w-full border-b" value="${item.dept}" onchange="rawData[${index}].dept=this.value;renderDataTable()"></td><td class="p-2"><input class="w-full border-b text-slate-400" value="${item.group||''}" onchange="rawData[${index}].group=this.value"></td><td class="p-2"><input class="w-full border-b font-bold ${isDup?'text-red-600 bg-red-50':''}" value="${item.id}" onchange="rawData[${index}].id=this.value;renderDataTable()"></td><td class="p-2"><input class="w-full border-b" value="${item.name}" onchange="rawData[${index}].name=this.value"></td><td class="p-2"><input class="w-full border-b" value="${item.diet}" onchange="rawData[${index}].diet=this.value;renderDataTable()"></td><td class="p-2 text-center"><button onclick="rawData.splice(${index},1);renderDataTable()" class="text-red-400">✕</button></td>`;
                 tbody.appendChild(tr);
             });
             document.getElementById('id-error').classList.toggle('hidden', !hasDup);
@@ -218,31 +275,17 @@
         function importProject(input) {
             const reader = new FileReader();
             reader.onload = (e) => {
-                try {
-                    const d = JSON.parse(e.target.result);
-                    rawData = d.rawData; tables = d.tables; deptAliases = d.deptAliases;
-                    renderCanvas(); alert('專案匯入成功！');
-                } catch(err) { alert('檔案格式不正確'); }
+                const d = JSON.parse(e.target.result);
+                rawData = d.rawData; tables = d.tables; deptAliases = d.deptAliases;
+                renderCanvas(); alert('專案匯入成功！');
             };
             reader.readAsText(input.files[0]);
         }
 
         function exportImage() {
             html2canvas(document.getElementById('capture-area'), { scale: 2 }).then(canvas => {
-                const a = document.createElement('a'); a.download = `尾牙桌圖_${new Date().toLocaleDateString()}.png`; a.href = canvas.toDataURL(); a.click();
+                const a = document.createElement('a'); a.download = `尾牙桌圖.png`; a.href = canvas.toDataURL(); a.click();
             });
-        }
-
-        function openManageModal(t){
-            const isVeg = (t.assigned||[]).some(a=>a.type==='素');
-            document.getElementById('modal-title').innerHTML = `管理桌位 ${t.displayId} ${isVeg?'<span class="text-green-600">(素)</span>':''}`;
-            const c = document.getElementById('modal-content'); c.innerHTML = '';
-            t.assigned.forEach((a,i)=>{
-                const d = document.createElement('div'); d.className="p-3 bg-slate-100 rounded-xl flex justify-between items-center";
-                d.innerHTML = `<span class="font-bold">${a.dept}</span> <div>人數:<input type="number" value="${a.count}" class="w-12 mx-2 border rounded" onchange="t.assigned[${i}].count=parseInt(this.value)"> <button onclick="t.assigned.splice(${i},1);openManageModal(t)" class="text-red-500">✕</button></div>`;
-                c.appendChild(d);
-            });
-            document.getElementById('manage-modal').classList.remove('hidden');
         }
 
         function setMode(m){ 
@@ -251,22 +294,22 @@
             document.getElementById('mode-main').className=m==='main'?'py-3 rounded-xl bg-amber-500 text-white font-bold shadow-lg text-sm':'py-3 rounded-xl bg-white border-2 border-slate-200 text-slate-600 font-bold text-sm';
         }
         function setAssignType(t){ 
-            assignType=t; 
+            assignType=t; selectedDept=null;
             document.getElementById('veg-global-stats').classList.toggle('hidden', t!=='素');
             document.getElementById('btn-meat').className = t==='葷'?'flex-1 py-3 rounded-xl text-sm font-bold bg-white shadow-sm text-indigo-600':'flex-1 py-3 rounded-xl text-sm font-bold text-slate-400';
             document.getElementById('btn-veg').className = t==='素'?'flex-1 py-3 rounded-xl text-sm font-bold bg-white shadow-sm text-green-600':'flex-1 py-3 rounded-xl text-sm font-bold text-slate-400';
             renderSidebar(); 
         }
-        function closeManageModal(){ document.getElementById('manage-modal').classList.add('hidden'); renderCanvas(); }
-        function openDataModal(){ document.getElementById('data-modal').classList.remove('hidden'); renderDataTable(); }
         function closeDataModal(){ document.getElementById('data-modal').classList.add('hidden'); renderCanvas(); }
-        function addRow(){ rawData.unshift({dept:'新部門',id:'',name:'新同仁',diet:'葷'}); renderDataTable(); }
+        function openDataModal(){ document.getElementById('data-modal').classList.remove('hidden'); renderDataTable(); }
+        function addRow(){ rawData.unshift({dept:'新部門',id:'',name:'新人員',diet:'葷'}); renderDataTable(); }
         function save(){ localStorage.setItem('tailor_v13_data', JSON.stringify({rawData, tables, deptAliases})); }
+        
         function assignToTable(t) {
             const isVeg = (t.assigned||[]).some(a=>a.type==='素'), isMeat = (t.assigned||[]).some(a=>a.type==='葷');
-            if((assignType==='素'&&isMeat) || (assignType==='葷'&&isVeg)) return alert("此桌飲食類型不同，請勿混坐！");
+            if((assignType==='素'&&isMeat) || (assignType==='葷'&&isVeg)) return alert("素食與葷食不可併桌！");
             const rem = getRemain(selectedDept, assignType);
-            const countStr = prompt(`分配 ${selectedDept} 到第 ${t.displayId} 桌，剩餘 ${rem} 人：`, rem);
+            const countStr = prompt(`分配 ${selectedDept} (${assignType}食) 到第 ${t.displayId} 桌\n該單位剩餘 ${rem} 人，請輸入人數：`, rem);
             const count = parseInt(countStr);
             if(count > 0) {
                 const ex = t.assigned.find(a=>a.dept===selectedDept && a.type===assignType);
