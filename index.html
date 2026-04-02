@@ -260,57 +260,78 @@
         }
 
         function renderSidebar() {
-            const list = document.getElementById('dept-list'), s = getStats(), depts = Object.keys(s);
-            list.innerHTML = '';
-            
-            // 更新順序清單：補上新部門，刪除不存在的部門
-            let currentOrder = deptOrder.filter(d => depts.includes(d));
-            depts.forEach(d => { if(!currentOrder.includes(d)) currentOrder.push(d); });
-            deptOrder = currentOrder;
+    const list = document.getElementById('dept-list'), s = getStats(), depts = Object.keys(s);
+    list.innerHTML = '';
+    
+    // 1. 同步部門清單 (確保新部門被加入，舊部門被移除)
+    let currentOrder = deptOrder.filter(d => depts.includes(d));
+    depts.forEach(d => { if(!currentOrder.includes(d)) currentOrder.push(d); });
+    deptOrder = currentOrder;
 
-            deptOrder.forEach((d, index) => {
-                const rem = getRemain(d, assignType);
-                const isSel = selectedDept === d;
-                const div = document.createElement('div');
-                div.draggable = true;
-                div.className = `p-4 rounded-2xl border-2 cursor-pointer transition-all border-l-[12px] flex items-center justify-between font-black relative ${isSel?'ring-4 ring-indigo-500 ':''} ${rem>0?'bg-white shadow-md border-slate-200':'bg-slate-50 opacity-30 border-transparent text-slate-400'}`;
-                div.style.borderLeftColor = deptColors[d];
-                
-                // 拖拽排序邏輯
-                div.ondragstart = (e) => { e.dataTransfer.setData('text/plain', index); div.style.opacity = "0.4"; };
-                div.ondragover = (e) => e.preventDefault();
-                div.ondrop = (e) => {
-                    e.preventDefault();
-                    const fromIdx = e.dataTransfer.getData('text/plain');
-                    const movedItem = deptOrder.splice(fromIdx, 1)[0];
-                    deptOrder.splice(index, 0, movedItem);
-                    save(); renderSidebar();
-                };
-                div.ondragend = () => div.style.opacity = "1";
+    deptOrder.forEach((d, index) => {
+        const rem = getRemain(d, assignType);
+        const isSel = selectedDept === d;
+        const div = document.createElement('div');
+        
+        // 設定為可拖拽
+        div.draggable = true;
+        div.className = `p-4 rounded-2xl border-2 cursor-pointer transition-all border-l-[12px] flex items-center justify-between font-black relative ${isSel?'ring-4 ring-indigo-500 ':''} ${rem>0?'bg-white shadow-md border-slate-200':'bg-slate-50 opacity-30 border-transparent text-slate-400'}`;
+        div.style.borderLeftColor = deptColors[d];
+        
+        // --- 拖拽邏輯 ---
+        div.ondragstart = (e) => { 
+            e.dataTransfer.setData('text/plain', index); 
+            div.style.opacity = "0.4"; 
+        };
+        div.ondragover = (e) => e.preventDefault();
+        div.ondrop = (e) => {
+            e.preventDefault();
+            const fromIdx = e.dataTransfer.getData('text/plain');
+            const movedItem = deptOrder.splice(fromIdx, 1)[0];
+            deptOrder.splice(index, 0, movedItem);
+            save(); renderSidebar();
+        };
+        div.ondragend = () => div.style.opacity = "1";
 
-                // 顏色條
-                const colorStrip = document.createElement('div');
-                colorStrip.className = "absolute left-0 top-0 bottom-0 w-3 cursor-pointer hover:w-6 transition-all z-10";
-                colorStrip.style.backgroundColor = deptColors[d];
-                colorStrip.onclick = (e) => {
-                    e.stopPropagation();
-                    const nc = prompt(`更改顏色`, deptColors[d]);
-                    if(nc) { deptColors[d]=nc; renderCanvas(); }
-                };
-                div.appendChild(colorStrip);
+        // --- 核心修正：點擊換色條 (加入 z-index 與 stopPropagation) ---
+        const colorStrip = document.createElement('div');
+        colorStrip.className = "absolute left-[-12px] top-0 bottom-0 w-6 cursor-pointer hover:bg-black/10 transition-all z-20";
+        // 雖然邊框已經有顏色，但為了點擊感應，我們放一個透明但有寬度的區域在左側
+        colorStrip.onclick = (e) => {
+            e.stopPropagation(); // 阻止觸發外層 div 的選取部門事件
+            const nc = prompt(`更改「${d}」的代表顏色 (請輸入 hex 或顏色名稱)`, deptColors[d]);
+            if(nc) { 
+                deptColors[d] = nc; 
+                save(); 
+                renderCanvas(); // 畫布同步更新
+            }
+        };
+        div.appendChild(colorStrip);
 
-                div.innerHTML += `<span>${d}</span><span class="bg-slate-100 px-3 py-1 rounded-lg text-indigo-600">${rem} 人</span>`;
-                div.onclick = () => { if(rem > 0) { selectedDept = (selectedDept === d ? null : d); renderSidebar(); } };
-                div.oncontextmenu = (e) => {
-                    e.preventDefault();
-                    const na = prompt(`設定簡稱`, deptAliases[d] || d.substring(0, 2));
-                    if(na !== null) { deptAliases[d] = na; renderCanvas(); }
-                };
-                list.appendChild(div);
-            });
-            let totalRem = 0; Object.keys(s).forEach(d => totalRem += getRemain(d, assignType));
-            document.getElementById('global-stats').innerText = `${assignType}食待排：${totalRem} 人`;
-        }
+        // --- 文字內容 ---
+        div.innerHTML += `<span class="pointer-events-none">${d}</span><span class="bg-slate-100 px-3 py-1 rounded-lg text-indigo-600 pointer-events-none">${rem} 人</span>`;
+        
+        // --- 部門點擊選取 ---
+        div.onclick = () => { 
+            if(rem > 0) { 
+                selectedDept = (selectedDept === d ? null : d); 
+                renderSidebar(); 
+            } 
+        };
+
+        // --- 右鍵設定簡稱 ---
+        div.oncontextmenu = (e) => {
+            e.preventDefault();
+            const na = prompt(`設定「${d}」簡稱`, deptAliases[d] || d.substring(0, 2));
+            if(na !== null) { deptAliases[d] = na; save(); renderCanvas(); }
+        };
+
+        list.appendChild(div);
+    });
+
+    let totalRem = 0; Object.keys(s).forEach(d => totalRem += getRemain(d, assignType));
+    document.getElementById('global-stats').innerText = `${assignType}食待排：${totalRem} 人`;
+}
 
         function save(){ 
             localStorage.setItem('tailor_v13_data', JSON.stringify({ rawData, tables, deptAliases, deptColors, deptOrder })); 
@@ -339,7 +360,38 @@
         }
 
         function setMode(m) { currentTableMode = m; document.getElementById('mode-normal').classList.toggle('btn-active-indigo', m==='normal'); document.getElementById('mode-main').classList.toggle('btn-active-orange', m==='main'); }
-        function setAssignType(t) { assignType = t; selectedDept = null; document.getElementById('btn-meat').classList.toggle('btn-active-indigo', t==='葷'); document.getElementById('btn-veg').classList.toggle('btn-active-green', t==='素'); renderSidebar(); }
+        function setAssignType(t) { 
+    assignType = t; 
+    selectedDept = null; 
+    
+    // 更新按鈕樣式
+    document.getElementById('btn-meat').classList.toggle('btn-active-indigo', t==='葷'); 
+    document.getElementById('btn-veg').classList.toggle('btn-active-green', t==='素'); 
+
+    // 如果切換到素食，執行自動重排
+    if (t === '素') {
+        autoSortVegFirst();
+    }
+    
+    renderSidebar(); 
+}
+
+// 自動將有素食的部門排到最前面的邏輯
+function autoSortVegFirst() {
+    const s = getStats();
+    // 將部門分成：有素食待排、無素食待排
+    const hasVeg = [], noVeg = [];
+    
+    deptOrder.forEach(d => {
+        const remVeg = getRemain(d, '素');
+        if (remVeg > 0) hasVeg.push(d);
+        else noVeg.push(d);
+    });
+    
+    // 重新組合順序：有素食的在前，其餘在後
+    deptOrder = [...hasVeg, ...noVeg];
+    save(); // 存下這個由系統調整過的順序
+}
 
         function exportProject() { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({rawData, tables, deptAliases, deptColors, deptOrder})], {type: 'application/json'})); a.download = `尾牙專案.json`; a.click(); }
         function importProject(input) { const reader = new FileReader(); reader.onload = (e) => { const d = JSON.parse(e.target.result); rawData = d.rawData; tables = d.tables; deptAliases = d.deptAliases; deptColors = d.deptColors || {}; deptOrder = d.deptOrder || []; renderCanvas(); }; reader.readAsText(input.files[0]); }
