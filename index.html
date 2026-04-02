@@ -244,35 +244,39 @@ function getRemain(dName, type) {
                     const table = tables.find(t=>t.r===r && t.c===c);
                     
                     if(table){
-                        const hasPeople = (table.assigned || []).some(a => a.count > 0);
+                        const total = (table.assigned || []).reduce((s,a)=>s+a.count, 0);
+                        const isOver = total > table.capacity; // 判斷是否人數爆滿
                         const isVeg = (table.assigned || []).some(a => a.type === '素');
+                        const hasPeople = total > 0;
                         
                         const tableEl = document.createElement('div');
                         tableEl.draggable = true;
                         
-                        // 基礎樣式：如果有排人就用部門色，沒排人就統一用淺灰色 (bg-slate-300)
-                        tableEl.className = `w-[75px] h-[75px] rounded-full shadow-lg flex flex-col items-center justify-center text-white cursor-move relative border-2 border-white transition-all ${isVeg ? 'veg-table-style' : ''}`;
+                        // 基礎樣式與紅框 (status-over) 判斷
+                        tableEl.className = `w-[75px] h-[75px] rounded-full shadow-lg flex flex-col items-center justify-center text-white cursor-move relative border-2 border-white transition-all ${isVeg ? 'veg-table-style' : ''} ${isOver ? 'status-over' : ''}`;
                         
-                        // 顏色邏輯修正
+                        // 顏色邏輯修正：主桌固定為橘黃色，一般桌空桌為灰色
                         if(!isVeg) {
-                            if (!hasPeople) {
-                                tableEl.style.backgroundColor = "#cbd5e1"; // 沒人時顯示灰色
+                            if (table.type === 'main') {
+                                tableEl.style.backgroundColor = "#fbbf24"; // 主桌專用橘黃色
+                            } else if (!hasPeople) {
+                                tableEl.style.backgroundColor = "#cbd5e1"; // 一般空桌顯示灰色
                             } else {
-                                tableEl.style.backgroundColor = table.type==='main' ? "#fed33c" : getDeptColor(table.assigned[0].dept);
+                                // 一般桌有排人，取第一筆部門的顏色
+                                tableEl.style.backgroundColor = getDeptColor(table.assigned[0].dept);
                             }
                         }
 
                         // 顯示桌號標籤
                         tableEl.innerHTML = `<div class="table-id-tag">${table.displayId}</div>`;
 
-                        // 顯示已分配部門 (最多顯示兩筆)
+                        // 顯示分配內容
                         (table.assigned || []).filter(a => a.count > 0).slice(0, 2).forEach(a => {
                             tableEl.innerHTML += `<div class="text-[13px] font-black leading-tight drop-shadow-md">${deptAliases[a.dept] || a.dept.substring(0, 2)}:${a.count}</div>`;
                         });
 
                         if(isVeg) tableEl.innerHTML += `<div class="veg-marker">素</div>`;
                         
-                        // 點擊邏輯：若選了部門就分配，沒選部門就打開管理視窗
                         tableEl.onclick=()=>{ 
                             if(selectedDept) assignToTable(table); 
                             else openManageModal(table); 
@@ -283,7 +287,6 @@ function getRemain(dName, type) {
                         tableEl.ondragend = () => { draggedTable = null; renderCanvas(); };
                         cell.appendChild(tableEl);
                     } else {
-                        // 沒桌子的地方顯示虛線圈
                         cell.className += " border border-dashed border-slate-200 hover:bg-indigo-50 cursor-pointer";
                         cell.onclick=()=>{ tables.push({r,c,type:currentTableMode,assigned:[]}); renderCanvas(); };
                     }
