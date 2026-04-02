@@ -82,7 +82,6 @@
     <button onclick="closeDataModal()" id="save-data-btn" class="px-5 py-2 bg-slate-900 text-white rounded-xl font-bold text-sm">儲存</button>
     <button onclick="cancelDataChanges()" class="px-5 py-2 bg-slate-200 text-slate-600 rounded-xl font-bold text-sm">取消</button>
     
-    <button onclick="clearAllData()" class="px-5 py-2 bg-red-100 text-red-600 rounded-xl font-bold text-sm hover:bg-red-600 hover:text-white transition-all">清除</button>
 </div>
             </div>
             <div class="flex-1 overflow-auto border rounded-2xl">
@@ -99,6 +98,16 @@
                     </thead>
                     <tbody id="data-table-body" class="divide-y"></tbody>
                 </table>
+                </div> 
+
+            <div class="mt-6 flex justify-end items-center gap-3">
+                <span class="text-xs text-slate-400 mr-auto font-medium">* 匯出 Excel 可作為備份使用，清除資料前請務必確認。</span>
+                
+                <button onclick="exportExcelList()" class="px-6 py-2.5 bg-white border-2 border-emerald-500 text-emerald-600 rounded-xl font-bold text-sm hover:bg-emerald-50 transition-all">匯出名單Excel</button>
+                
+                <button onclick="clearAllData()" class="px-6 py-2.5 bg-red-50 text-red-600 rounded-xl font-bold text-sm hover:bg-red-600 hover:text-white transition-all">清除所有名單</button>
+            </div>
+        </div> </div>
             </div>
         </div>
     </div>
@@ -164,11 +173,11 @@
         }
         // 清除所有名單資料
 function clearAllData() {
-    if (confirm("⚠️ 注意：這將會刪除系統內『所有』已匯入及手動輸入的名單資料！\n\n您確定要執行嗎？")) {
-        tempRawData = []; // 清空暫存
-        rawData = [];     // 清空正式資料
+    if (confirm("⚠️ 注意：這將會刪除系統內『所有』名單資料！\n\n您確定要執行嗎？")) {
+        tempRawData = []; 
+        rawData = [];     
         renderDataTable();
-        alert("資料已全部清空。請記得按下『確認儲存』以套用變更。");
+        alert("資料已清空。請按下上方的『儲存』以套用變更。");
     }
 }
 
