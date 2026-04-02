@@ -30,18 +30,18 @@
         <h1 class="text-2xl font-black text-indigo-600 mb-4 tracking-tighter">尾牙排座系統 V13.7</h1>
 
         <div class="grid grid-cols-2 gap-2 mb-4">
-            <button onclick="setMode('normal')" id="mode-normal" class="py-3 rounded-xl border-2 border-slate-100 text-slate-400 font-bold text-sm transition-all btn-active-indigo">一般桌 (10人)</button>
-            <button onclick="setMode('main')" id="mode-main" class="py-3 rounded-xl border-2 border-slate-100 text-slate-400 font-bold text-sm transition-all">主桌 (12人)</button>
+            <button onclick="setMode('normal')" id="mode-normal" class="py-3 rounded-xl border-2 border-slate-100 text-slate-400 font-bold text-base transition-all btn-active-indigo">一般桌 (10人)</button>
+            <button onclick="setMode('main')" id="mode-main" class="py-3 rounded-xl border-2 border-slate-100 text-slate-400 font-bold text-base transition-all">主桌 (12人)</button>
         </div>
 
         <div class="bg-slate-100 p-1 rounded-2xl flex mb-4">
-            <button id="btn-meat" onclick="setAssignType('葷')" class="flex-1 py-3 rounded-xl text-sm font-bold transition-all btn-active-indigo">排葷食</button>
-            <button id="btn-veg" onclick="setAssignType('素')" class="flex-1 py-3 rounded-xl text-sm font-bold text-slate-400 transition-all">排素食</button>
+            <button id="btn-meat" onclick="setAssignType('葷')" class="flex-1 py-3 rounded-xl text-base font-bold transition-all btn-active-indigo">排葷食</button>
+            <button id="btn-veg" onclick="setAssignType('素')" class="flex-1 py-3 rounded-xl text-base font-bold text-slate-400 transition-all">排素食</button>
         </div>
 
         <div class="flex-1 overflow-y-auto border-t pt-4">
             <div class="flex justify-between items-end mb-3">
-                <h3 class="font-black text-slate-400 text-sm tracking-widest uppercase">待排部門 (剩餘人數)</h3>
+                <h3 class="font-black text-slate-400 text-base tracking-widest uppercase">待排部門 (剩餘人數)</h3>
                 <span id="global-stats" class="text-sm font-bold text-indigo-500"></span>
             </div>
             <div id="dept-list" class="space-y-3 pb-10 text-lg"></div>
