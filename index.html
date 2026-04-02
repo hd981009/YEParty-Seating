@@ -13,7 +13,21 @@
         @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
         .veg-table-style { background-color: #16a34a !important; border: 2px solid white !important; }
         .veg-marker { position: absolute; bottom: -4px; right: -4px; background: #22c55e; color: white; border-radius: 50%; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; font-size: 14px; border: 2px solid white; font-weight: bold; z-index: 20; }
-        .table-id-tag { position: absolute; top: -12px; background: #1e293b; padding: 2px 10px; border-radius: 14px; font-size: 13px; color: white; z-index: 10; font-weight: bold; border: 2px solid white; }
+        .table-id-tag { 
+    position: absolute; 
+    top: -12px; 
+    left: 50%; /* 新增：鎖定水平中心 */
+    transform: translateX(-50%); /* 新增：精準置中 */
+    background: #1e293b; 
+    padding: 2px 10px; 
+    border-radius: 14px; 
+    font-size: 13px; 
+    color: white; 
+    z-index: 10; 
+    font-weight: bold; 
+    border: 2px solid white; 
+    white-space: nowrap; /* 新增：防止文字換行造成偏移 */
+}
         .modal-bg { background-color: rgba(0,0,0,0.7); backdrop-filter: blur(5px); }
         #scroll-wrapper { overflow: auto !important; height: 100vh; flex-grow: 1; }
         .stage-container { width: 100%; display: flex; justify-content: center; margin-bottom: 2rem; }
@@ -461,7 +475,37 @@ function autoSortVegFirst() {
     }; 
     reader.readAsText(input.files[0]); 
 }
-        function exportImage() { html2canvas(document.getElementById('capture-area'), { scale: 2 }).then(canvas => { const a = document.createElement('a'); a.download = `尾牙桌圖.png`; a.href = canvas.toDataURL(); a.click(); }); }
+        function exportImage() {
+    const captureArea = document.getElementById('capture-area');
+    const scrollWrapper = document.getElementById('scroll-wrapper');
+
+    // 1. 暫存目前的捲軸位置
+    const oldScrollTop = scrollWrapper.scrollTop;
+    const oldScrollLeft = scrollWrapper.scrollLeft;
+
+    // 2. 將捲軸歸零（這是防止 html2canvas 座標偏移的關鍵）
+    scrollWrapper.scrollTop = 0;
+    scrollWrapper.scrollLeft = 0;
+
+    // 3. 執行截圖
+    html2canvas(captureArea, { 
+        scale: 2, 
+        useCORS: true,
+        backgroundColor: "#e2e8f0", // 確保背景顏色跟網頁一致
+        scrollY: 0, 
+        scrollX: 0
+    }).then(canvas => {
+        const a = document.createElement('a');
+        const date = new Date().toISOString().split('T')[0];
+        a.download = `貿協尾牙桌圖_${date}.png`;
+        a.href = canvas.toDataURL("image/png");
+        a.click();
+        
+        // 4. 還原捲軸位置，不影響使用者操作
+        scrollWrapper.scrollTop = oldScrollTop;
+        scrollWrapper.scrollLeft = oldScrollLeft;
+    });
+}
         
         function assignToTable(t) {
             const isVeg = (t.assigned||[]).some(a=>a.type==='素'), isMeat = (t.assigned||[]).some(a=>a.type==='葷');
