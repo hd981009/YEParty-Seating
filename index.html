@@ -230,34 +230,62 @@ function getRemain(dName, type) {
             tables.sort((a,b)=>a.r!==b.r?a.r-b.r:a.c-b.c);
             let n=1, m=1; 
             tables.forEach(t=>{ t.displayId=t.type==='main'?`M${m++}`:n++; t.capacity=t.type==='main'?12:10; });
-            const canvas = document.getElementById('canvas'); canvas.innerHTML = '';
+            
+            const canvas = document.getElementById('canvas'); 
+            canvas.innerHTML = '';
+
             for(let r=1; r<=ROWS; r++){
                 for(let c=1; c<=COLS; c++){
                     const cell = document.createElement('div');
                     cell.className = `grid-cell rounded-full flex items-center justify-center relative ${c===WALKWAY_COL?'bg-slate-50':''}`;
                     cell.ondragover = (e) => e.preventDefault();
                     cell.ondrop = () => handleDrop(r, c);
+                    
                     const table = tables.find(t=>t.r===r && t.c===c);
+                    
                     if(table){
-                        const total = (table.assigned||[]).reduce((s,a)=>s+a.count,0);
-                        const isVeg = (table.assigned||[]).some(a => a.type === '素');
+                        const hasPeople = (table.assigned || []).some(a => a.count > 0);
+                        const isVeg = (table.assigned || []).some(a => a.type === '素');
+                        
                         const tableEl = document.createElement('div');
                         tableEl.draggable = true;
-                        // 加入桌號標籤與內容
-tableEl.innerHTML = `<div class="table-id-tag">${table.displayId}</div>`;
+                        
+                        // 基礎樣式：如果有排人就用部門色，沒排人就統一用淺灰色 (bg-slate-300)
+                        tableEl.className = `w-[75px] h-[75px] rounded-full shadow-lg flex flex-col items-center justify-center text-white cursor-move relative border-2 border-white transition-all ${isVeg ? 'veg-table-style' : ''}`;
+                        
+                        // 顏色邏輯修正
+                        if(!isVeg) {
+                            if (!hasPeople) {
+                                tableEl.style.backgroundColor = "#cbd5e1"; // 沒人時顯示灰色
+                            } else {
+                                tableEl.style.backgroundColor = table.type==='main' ? "#fed33c" : getDeptColor(table.assigned[0].dept);
+                            }
+                        }
 
-(table.assigned || []).filter(a => a.count > 0).slice(0, 2).forEach(a => {
-    tableEl.innerHTML += `<div class="text-[13px] font-black leading-tight drop-shadow-md">${deptAliases[a.dept] || a.dept.substring(0, 2)}:${a.count}</div>`;
-});
+                        // 顯示桌號標籤
+                        tableEl.innerHTML = `<div class="table-id-tag">${table.displayId}</div>`;
+
+                        // 顯示已分配部門 (最多顯示兩筆)
+                        (table.assigned || []).filter(a => a.count > 0).slice(0, 2).forEach(a => {
+                            tableEl.innerHTML += `<div class="text-[13px] font-black leading-tight drop-shadow-md">${deptAliases[a.dept] || a.dept.substring(0, 2)}:${a.count}</div>`;
+                        });
+
                         if(isVeg) tableEl.innerHTML += `<div class="veg-marker">素</div>`;
-                        tableEl.onclick=()=>{ if(selectedDept) assignToTable(table); else openManageModal(table); };
+                        
+                        // 點擊邏輯：若選了部門就分配，沒選部門就打開管理視窗
+                        tableEl.onclick=()=>{ 
+                            if(selectedDept) assignToTable(table); 
+                            else openManageModal(table); 
+                        };
+
                         tableEl.oncontextmenu=(e)=>{ e.preventDefault(); if(confirm('刪除桌位？')) { tables=tables.filter(t=>t!==table); renderCanvas(); } };
                         tableEl.ondragstart = () => { draggedTable = table; tableEl.style.opacity = "0.4"; };
                         tableEl.ondragend = () => { draggedTable = null; renderCanvas(); };
                         cell.appendChild(tableEl);
                     } else {
+                        // 沒桌子的地方顯示虛線圈
                         cell.className += " border border-dashed border-slate-200 hover:bg-indigo-50 cursor-pointer";
-                        cell.onclick=()=>{tables.push({r,c,type:currentTableMode,assigned:[]}); renderCanvas();};
+                        cell.onclick=()=>{ tables.push({r,c,type:currentTableMode,assigned:[]}); renderCanvas(); };
                     }
                     canvas.appendChild(cell);
                 }
