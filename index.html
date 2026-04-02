@@ -118,7 +118,7 @@
         let tempRawData = [], backupTables = []; 
         let currentTableMode = 'normal', assignType = '葷', selectedDept = null, draggedTable = null;
 
-        // 擴充至 25 種精選顏色 (包含深淺層次，確保視覺辨識度)
+// 擴充至 25 種精選顏色 (包含深淺層次，確保視覺辨識度)
 const PALETTE = [
     "#4f46e5", "#ef4444", "#10b981", "#f59e0b", "#0ea5e9", 
     "#8b5cf6", "#ec4899", "#f97316", "#14b8a6", "#6366f1", 
@@ -138,42 +138,39 @@ function getDeptColor(deptName) {
     return PALETTE[index];
 }
 
-        // 修正後的 init: 確保所有資料都能正確讀取
-        function init() {
-            const saved = localStorage.getItem('tailor_v13_data');
-            if(saved) {
-                const d = JSON.parse(saved);
-                rawData = d.rawData || []; 
-                tables = d.tables || []; 
-                deptAliases = d.deptAliases || {};
-                deptOrder = d.deptOrder || []; 
-            }
-            renderCanvas(); // renderCanvas 會連帶觸發 renderSidebar
-        }
+// 修正後的 init: 確保所有資料都能正確讀取
+function init() {
+    const saved = localStorage.getItem('tailor_v13_data');
+    if(saved) {
+        const d = JSON.parse(saved);
+        rawData = d.rawData || []; 
+        tables = d.tables || []; 
+        deptAliases = d.deptAliases || {};
+        deptOrder = d.deptOrder || []; 
+    }
+    renderCanvas(); // renderCanvas 會連帶觸發 renderSidebar
+}
 
 function getStats() {
     let s = {};
     rawData.forEach(d => {
-        if(!d.dept) return;
-        if(!s[d.dept]) {
-            s[d.dept] = { meat: 0, veg: 0 };
-        }
-        if(String(d.diet).includes('素')) s[d.dept].veg++; 
+        if (!d.dept) return;
+        if (!s[d.dept]) s[d.dept] = { meat: 0, veg: 0 };
+        if (String(d.diet).includes('素')) s[d.dept].veg++; 
         else s[d.dept].meat++;
     });
     return s;
 }
-                if(String(d.diet).includes('素')) s[d.dept].veg++; else s[d.dept].meat++;
-            });
-            return s;
-        }
 
-        function getRemain(dName, type) {
-            const stats = getStats()[dName] || { meat:0, veg:0 };
-            let assigned = 0;
-            tables.forEach(t => (t.assigned || []).forEach(a => { if(a.dept === dName && a.type === type) assigned += a.count; }));
-            return (type === '葷' ? stats.meat : stats.veg) - assigned;
-        }
+// 緊接著下一段函數
+function getRemain(dName, type) {
+    const stats = getStats()[dName] || { meat: 0, veg: 0 };
+    let assigned = 0;
+    tables.forEach(t => (t.assigned || []).forEach(a => { 
+        if (a.dept === dName && a.type === type) assigned += a.count; 
+    }));
+    return (type === '葷' ? stats.meat : stats.veg) - assigned;
+}
 
         function openDataModal() {
             tempRawData = JSON.parse(JSON.stringify(rawData)); 
