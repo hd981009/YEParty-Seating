@@ -48,12 +48,14 @@
         </div>
         
         <div class="pt-4 border-t grid grid-cols-2 gap-2">
-            <button onclick="openDataModal()" class="py-3 bg-slate-800 text-white rounded-xl text-xs font-bold shadow-md">名單數據中心</button>
-            <button onclick="exportImage()" class="py-3 bg-emerald-600 text-white rounded-xl text-xs font-bold shadow-md">匯出桌圖PNG</button>
-            <button onclick="exportProject()" class="py-2 border border-slate-200 rounded text-[10px] text-slate-400">儲存專案</button>
-            <button onclick="document.getElementById('import-project').click()" class="py-2 border border-slate-200 rounded text-[10px] text-slate-400">讀取專案</button>
-            <input type="file" id="import-project" class="hidden" accept=".json" onchange="importProject(this)"/>
-        </div>
+    <button onclick="openDataModal()" class="py-3 bg-slate-800 text-white rounded-xl text-sm font-bold shadow-md">名單數據中心</button>
+    
+    <button onclick="exportImage()" class="py-3 bg-emerald-600 text-white rounded-xl text-sm font-bold shadow-md">匯出桌圖PNG</button>
+    
+    <button onclick="exportProject()" class="py-2 border border-slate-200 rounded text-xs text-slate-400">儲存專案</button>
+    
+    <button onclick="document.getElementById('import-project').click()" class="py-2 border border-slate-200 rounded text-xs text-slate-400">讀取專案</button>
+</div>
     </div>
 
     <div id="scroll-wrapper" class="bg-slate-200">
