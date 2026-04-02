@@ -114,23 +114,25 @@
 
     <script>
         const ROWS = 12, COLS = 19, WALKWAY_COL = 10;
-        let rawData = [], tables = [], deptAliases = {}, deptColors = {};
-        let deptOrder = []; // 用來存部門的自訂順序
-        let tempRawData = []; 
-        let backupTables = []; // 新增這行，用來存放打開視窗前的桌位狀態
+        let rawData = [], tables = [], deptAliases = {}, deptColors = {}, deptOrder = []; 
+        let tempRawData = [], backupTables = []; 
         let currentTableMode = 'normal', assignType = '葷', selectedDept = null, draggedTable = null;
 
         const PALETTE = ["#4f46e5", "#e11d48", "#8b5cf6", "#0ea5e9", "#f43f5e", "#d946ef", "#f59e0b", "#10b981", "#06b6d4", "#f97316", "#6366f1", "#ec4899", "#14b8a6", "#ef4444", "#a855f7", "#3b82f6", "#22c55e", "#eab308", "#64748b", "#475569"];
 
+        // 修正後的 init: 確保所有資料都能正確讀取
         function init() {
-    const saved = localStorage.getItem('tailor_v13_data');
-    if(saved) {
-        const d = JSON.parse(saved);
-        // ... 原有的讀取程式碼 ...
-        deptOrder = d.deptOrder || []; // 加上這行
-    }
-    renderCanvas();
-}
+            const saved = localStorage.getItem('tailor_v13_data');
+            if(saved) {
+                const d = JSON.parse(saved);
+                rawData = d.rawData || []; 
+                tables = d.tables || []; 
+                deptAliases = d.deptAliases || {};
+                deptColors = d.deptColors || {};
+                deptOrder = d.deptOrder || []; 
+            }
+            renderCanvas(); // renderCanvas 會連帶觸發 renderSidebar
+        }
 
         function getStats() {
             let s = {};
@@ -139,9 +141,10 @@
                 if(!s[d.dept]) {
                     s[d.dept] = { meat: 0, veg: 0 };
                     if(!deptColors[d.dept]) {
-    const colorIndex = Object.keys(s).length % PALETTE.length;
-    deptColors[d.dept] = PALETTE[colorIndex];
-}
+                        const colorIndex = Object.keys(s).length % PALETTE.length;
+                        deptColors[d.dept] = PALETTE[colorIndex];
+                    }
+                }
                 if(String(d.diet).includes('素')) s[d.dept].veg++; else s[d.dept].meat++;
             });
             return s;
@@ -154,70 +157,41 @@
             return (type === '葷' ? stats.meat : stats.veg) - assigned;
         }
 
-// 1. 修正後的數據中心開啟與取消
-function openDataModal() {
-    tempRawData = JSON.parse(JSON.stringify(rawData)); 
-    backupTables = JSON.parse(JSON.stringify(tables)); 
-    document.getElementById('data-modal').classList.remove('hidden');
-    renderDataTable();
-}
+        function openDataModal() {
+            tempRawData = JSON.parse(JSON.stringify(rawData)); 
+            backupTables = JSON.parse(JSON.stringify(tables)); 
+            document.getElementById('data-modal').classList.remove('hidden');
+            renderDataTable();
+        }
 
-function cancelDataChanges() {
-    tables = JSON.parse(JSON.stringify(backupTables)); 
-    tempRawData = []; 
-    document.getElementById('data-modal').classList.add('hidden');
-    renderCanvas();
-    renderSidebar();
-}
+        function cancelDataChanges() {
+            tables = JSON.parse(JSON.stringify(backupTables)); 
+            tempRawData = []; 
+            document.getElementById('data-modal').classList.add('hidden');
+            renderCanvas();
+        }
 
-// 2. 修正後的清空邏輯 (請取代原本的 clearAllData)
-function clearAllData() {
-    if (confirm("⚠️ 注意：這將會刪除名單並清空所有桌位分配！\n\n(若按『取消』可恢復原狀)")) {
-        tempRawData = []; 
-        tables.forEach(t => {
-            t.assigned = []; 
-        });
-        renderDataTable(); 
-        renderCanvas(); 
-        renderSidebar();
-    }
-}
-        function exportExcelList() {
-            const targetData = (document.getElementById('data-modal').classList.contains('hidden')) ? rawData : tempRawData;
-            if (targetData.length === 0) return alert("目前沒有名單資料可匯出！");
-            const worksheetData = [
-                ["單位", "組別", "員編", "姓名", "飲食選擇"],
-                ...targetData.map(item => [item.dept, item.group, item.id, item.name, item.diet])
-            ];
-            const ws = XLSX.utils.aoa_to_sheet(worksheetData);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "尾牙名單");
-            XLSX.writeFile(wb, `尾牙名單匯出_${new Date().toLocaleDateString()}.xlsx`);
+        function clearAllData() {
+            if (confirm("⚠️ 注意：這將會刪除名單並清空所有桌位分配！")) {
+                tempRawData = []; 
+                tables.forEach(t => { t.assigned = []; });
+                renderDataTable(); renderCanvas();
+            }
         }
 
         function closeDataModal() {
-    // 檢查員編是否有重複
-    let ids = tempRawData.map(r => r.id).filter(id => id !== "");
-    let hasDup = ids.some((id, index) => ids.indexOf(id) !== index);
-    if(hasDup) {
-        alert("員編有重複，請修正後再儲存！");
-        return;
-    }
-    
-    rawData = JSON.parse(JSON.stringify(tempRawData)); // 正式定案
-    document.getElementById('data-modal').classList.add('hidden');
-    
-    save(); // 真正寫入硬碟儲存
-    renderCanvas();
-    renderSidebar();
-}
+            let ids = tempRawData.map(r => r.id).filter(id => id !== "");
+            if(ids.some((id, index) => ids.indexOf(id) !== index)) return alert("員編有重複！");
+            rawData = JSON.parse(JSON.stringify(tempRawData));
+            document.getElementById('data-modal').classList.add('hidden');
+            save(); renderCanvas();
+        }
 
         function renderDataTable() {
             const tbody = document.getElementById('data-table-body');
             tbody.innerHTML = '';
             let ids = tempRawData.map(r => r.id);
             let hasDup = false;
-
             tempRawData.forEach((item, index) => {
                 const isDup = item.id && ids.filter(x => x === item.id).length > 1;
                 if(isDup) hasDup = true;
@@ -235,33 +209,12 @@ function clearAllData() {
             document.getElementById('id-error').classList.toggle('hidden', !hasDup);
         }
 
-        function addRow() {
-            tempRawData.unshift({ dept: '', group: '', id: '', name: '', diet: '葷' });
-            renderDataTable();
-        }
-
-        function setMode(m) {
-            currentTableMode = m;
-            document.getElementById('mode-normal').className = `py-3 rounded-xl border-2 font-bold text-base transition-all ${m==='normal'?'btn-active-indigo':'border-slate-100 text-slate-400'}`;
-            document.getElementById('mode-main').className = `py-3 rounded-xl border-2 font-bold text-base transition-all ${m==='main'?'btn-active-orange':'border-slate-100 text-slate-400'}`;
-        }
-
-        function setAssignType(t) {
-            assignType = t;
-            selectedDept = null;
-            const isVeg = t === '素';
-            document.getElementById('btn-meat').className = `flex-1 py-3 rounded-xl text-base font-bold transition-all ${!isVeg?'btn-active-indigo':'text-slate-400'}`;
-            document.getElementById('btn-veg').className = `flex-1 py-3 rounded-xl text-base font-bold transition-all ${isVeg?'btn-active-green':'text-slate-400'}`;
-            renderSidebar();
-        }
+        function addRow() { tempRawData.unshift({ dept: '', group: '', id: '', name: '', diet: '葷' }); renderDataTable(); }
 
         function renderCanvas() {
             tables.sort((a,b)=>a.r!==b.r?a.r-b.r:a.c-b.c);
             let n=1, m=1; 
-            tables.forEach(t=>{
-                t.displayId=t.type==='main'?`M${m++}`:n++; 
-                t.capacity=t.type==='main'?12:10;
-            });
+            tables.forEach(t=>{ t.displayId=t.type==='main'?`M${m++}`:n++; t.capacity=t.type==='main'?12:10; });
             const canvas = document.getElementById('canvas'); canvas.innerHTML = '';
             for(let r=1; r<=ROWS; r++){
                 for(let c=1; c<=COLS; c++){
@@ -275,18 +228,16 @@ function clearAllData() {
                         const isVeg = (table.assigned||[]).some(a => a.type === '素');
                         const tableEl = document.createElement('div');
                         tableEl.draggable = true;
-                        tableEl.className = `w-[75px] h-[75px] rounded-full shadow-lg flex flex-col items-center justify-center text-white cursor-move relative border-2 border-white transition-all`;
-                        if(isVeg) tableEl.className += " veg-table-style";
-                        else if(table.type === 'main') tableEl.style.backgroundColor = "#fed33c"; 
-                        else { const mainDept = table.assigned.length > 0 ? table.assigned[0].dept : null; tableEl.style.backgroundColor = mainDept ? deptColors[mainDept] : "#94a3b8"; }
-                        if(total > table.capacity) tableEl.className += " status-over";
+                        tableEl.className = `w-[75px] h-[75px] rounded-full shadow-lg flex flex-col items-center justify-center text-white cursor-move relative border-2 border-white transition-all ${isVeg?'veg-table-style':''}`;
+                        if(!isVeg) tableEl.style.backgroundColor = table.type==='main' ? "#fed33c" : (table.assigned[0] ? deptColors[table.assigned[0].dept] : "#94a3b8");
+                        if(total > table.capacity) tableEl.classList.add("status-over");
                         tableEl.innerHTML = `<div class="table-id-tag">${table.displayId}</div>`;
                         (table.assigned || []).filter(a => a.count > 0).slice(0, 2).forEach(a => {
                             tableEl.innerHTML += `<div class="text-[13px] font-black leading-tight drop-shadow-md">${deptAliases[a.dept] || a.dept.substring(0, 2)}:${a.count}</div>`;
                         });
                         if(isVeg) tableEl.innerHTML += `<div class="veg-marker">素</div>`;
                         tableEl.onclick=()=>{ if(selectedDept) assignToTable(table); else openManageModal(table); };
-                        tableEl.oncontextmenu=(e)=>{ e.preventDefault(); if(confirm('刪除？')) tables = tables.filter(t=>t!==table); renderCanvas(); };
+                        tableEl.oncontextmenu=(e)=>{ e.preventDefault(); if(confirm('刪除桌位？')) { tables=tables.filter(t=>t!==table); renderCanvas(); } };
                         tableEl.ondragstart = () => { draggedTable = table; tableEl.style.opacity = "0.4"; };
                         tableEl.ondragend = () => { draggedTable = null; renderCanvas(); };
                         cell.appendChild(tableEl);
@@ -302,145 +253,103 @@ function clearAllData() {
 
         function handleDrop(r, c) {
             if(!draggedTable) return;
-            const targetTable = tables.find(t => t.r === r && t.c === c);
-            if(targetTable){ const oldR = draggedTable.r, oldC = draggedTable.c; draggedTable.r = r; draggedTable.c = c; targetTable.r = oldR; targetTable.c = oldC; }
+            const target = tables.find(t => t.r === r && t.c === c);
+            if(target){ const oR = draggedTable.r, oC = draggedTable.c; draggedTable.r = r; draggedTable.c = c; target.r = oR; target.c = oC; }
             else { draggedTable.r = r; draggedTable.c = c; }
             renderCanvas();
         }
 
-function renderSidebar() {
-    const list = document.getElementById('dept-list'), s = getStats();
-    list.innerHTML = '';
-    
-    // 取得當前所有部門
-    let depts = Object.keys(s);
-    
-    // 處理排序邏輯：如果沒存過順序，就用目前的部門列表初始化
-    if (deptOrder.length === 0 || deptOrder.length !== depts.length) {
-        deptOrder = depts; 
-    } else {
-        // 確保 deptOrder 裡的部門跟現在名單上的部門一致（防止刪除部門後出錯）
-        depts.sort((a, b) => deptOrder.indexOf(a) - deptOrder.indexOf(b));
-    }
+        function renderSidebar() {
+            const list = document.getElementById('dept-list'), s = getStats(), depts = Object.keys(s);
+            list.innerHTML = '';
+            
+            // 更新順序清單：補上新部門，刪除不存在的部門
+            let currentOrder = deptOrder.filter(d => depts.includes(d));
+            depts.forEach(d => { if(!currentOrder.includes(d)) currentOrder.push(d); });
+            deptOrder = currentOrder;
 
-    depts.forEach((d, index) => {
-        const rem = getRemain(d, assignType);
-        const isSel = selectedDept === d;
-        const div = document.createElement('div');
-        
-        // --- 拖拽功能實作 ---
-        div.draggable = true; 
-        div.ondragstart = (e) => {
-            e.dataTransfer.setData('text/plain', index);
-            div.style.opacity = "0.4";
-        };
-        div.ondragover = (e) => e.preventDefault();
-        div.ondrop = (e) => {
-            e.preventDefault();
-            const fromIdx = e.dataTransfer.getData('text/plain');
-            const toIdx = index;
-            const movedItem = deptOrder.splice(fromIdx, 1)[0];
-            deptOrder.splice(toIdx, 0, movedItem);
-            save(); // 搬完立刻存檔
-            renderSidebar();
-        };
-        div.ondragend = () => div.style.opacity = "1";
+            deptOrder.forEach((d, index) => {
+                const rem = getRemain(d, assignType);
+                const isSel = selectedDept === d;
+                const div = document.createElement('div');
+                div.draggable = true;
+                div.className = `p-4 rounded-2xl border-2 cursor-pointer transition-all border-l-[12px] flex items-center justify-between font-black relative ${isSel?'ring-4 ring-indigo-500 ':''} ${rem>0?'bg-white shadow-md border-slate-200':'bg-slate-50 opacity-30 border-transparent text-slate-400'}`;
+                div.style.borderLeftColor = deptColors[d];
+                
+                // 拖拽排序邏輯
+                div.ondragstart = (e) => { e.dataTransfer.setData('text/plain', index); div.style.opacity = "0.4"; };
+                div.ondragover = (e) => e.preventDefault();
+                div.ondrop = (e) => {
+                    e.preventDefault();
+                    const fromIdx = e.dataTransfer.getData('text/plain');
+                    const movedItem = deptOrder.splice(fromIdx, 1)[0];
+                    deptOrder.splice(index, 0, movedItem);
+                    save(); renderSidebar();
+                };
+                div.ondragend = () => div.style.opacity = "1";
 
-        const bgStyle = rem > 0 ? 'bg-white shadow-md border-slate-200' : 'bg-slate-50 opacity-30 border-transparent text-slate-400';
-        
-        // 注意：這裡一定要有 relative，否則顏色條會亂跑
-        div.className = `p-4 rounded-2xl border-2 cursor-pointer transition-all border-l-[12px] flex items-center justify-between font-black relative ${isSel?'ring-4 ring-indigo-500 ':''} ${bgStyle}`;
-        div.style.borderLeftColor = deptColors[d]; 
+                // 顏色條
+                const colorStrip = document.createElement('div');
+                colorStrip.className = "absolute left-0 top-0 bottom-0 w-3 cursor-pointer hover:w-6 transition-all z-10";
+                colorStrip.style.backgroundColor = deptColors[d];
+                colorStrip.onclick = (e) => {
+                    e.stopPropagation();
+                    const nc = prompt(`更改顏色`, deptColors[d]);
+                    if(nc) { deptColors[d]=nc; renderCanvas(); }
+                };
+                div.appendChild(colorStrip);
 
-        // 顏色條 (點擊換色)
-        const colorStrip = document.createElement('div');
-        colorStrip.className = "absolute left-0 top-0 bottom-0 w-3 cursor-pointer hover:w-6 transition-all z-10";
-        colorStrip.style.backgroundColor = deptColors[d];
-        colorStrip.onclick = (e) => {
-            e.stopPropagation();
-            const newColor = prompt(`輸入新的顏色 (如 #FF0000)`, deptColors[d]);
-            if (newColor) {
-                deptColors[d] = newColor;
-                renderSidebar(); renderCanvas(); save();
-            }
-        };
-        div.appendChild(colorStrip);
+                div.innerHTML += `<span>${d}</span><span class="bg-slate-100 px-3 py-1 rounded-lg text-indigo-600">${rem} 人</span>`;
+                div.onclick = () => { if(rem > 0) { selectedDept = (selectedDept === d ? null : d); renderSidebar(); } };
+                div.oncontextmenu = (e) => {
+                    e.preventDefault();
+                    const na = prompt(`設定簡稱`, deptAliases[d] || d.substring(0, 2));
+                    if(na !== null) { deptAliases[d] = na; renderCanvas(); }
+                };
+                list.appendChild(div);
+            });
+            let totalRem = 0; Object.keys(s).forEach(d => totalRem += getRemain(d, assignType));
+            document.getElementById('global-stats').innerText = `${assignType}食待排：${totalRem} 人`;
+        }
 
-        // 文字內容
-        div.innerHTML += `<span>${d}</span><span class="bg-slate-100 px-3 py-1 rounded-lg text-indigo-600">${rem} 人</span>`;
-        
-        // 左鍵選取
-        div.onclick = () => { if(rem > 0) { selectedDept = (selectedDept === d ? null : d); renderSidebar(); } };
-        
-        // 右鍵簡稱
-        div.oncontextmenu = (e) => {
-            e.preventDefault();
-            const newAlias = prompt(`設定「${d}」簡稱`, deptAliases[d] || d.substring(0, 2));
-            if (newAlias !== null) { deptAliases[d] = newAlias; renderCanvas(); save(); }
-        };
-        
-        list.appendChild(div);
-    });
-
-    let totalRem = 0; Object.keys(s).forEach(d => totalRem += getRemain(d, assignType));
-    document.getElementById('global-stats').innerText = `${assignType}食待排：${totalRem} 人`;
-}
+        function save(){ 
+            localStorage.setItem('tailor_v13_data', JSON.stringify({ rawData, tables, deptAliases, deptColors, deptOrder })); 
+        }
 
         function openManageModal(t) {
             document.getElementById('modal-title').innerText = `管理 ${t.displayId} 號桌`;
-            const c = document.getElementById('modal-content');
-            c.innerHTML = '';
+            const c = document.getElementById('modal-content'); c.innerHTML = '';
             t.assigned = t.assigned.filter(a => a.count > 0);
             t.assigned.forEach((a, i) => {
                 const itemDiv = document.createElement('div');
-                itemDiv.className = "p-3 bg-white border-2 rounded-xl flex justify-between items-center mb-2 font-bold hover:border-indigo-400 transition-all";
-                const nameSpan = document.createElement('span');
-                nameSpan.className = "text-sm cursor-pointer text-indigo-600 underline";
-                nameSpan.innerText = `${a.dept} (${a.type})`;
-                nameSpan.onclick = () => {
-                    const picked = t.assigned.splice(i, 1)[0];
-                    t.assigned.unshift(picked);
-                    openManageModal(t);
-                };
+                itemDiv.className = "p-3 bg-white border-2 rounded-xl flex justify-between items-center mb-2 font-bold";
+                itemDiv.innerHTML = `<span class="text-sm text-indigo-600">${a.dept} (${a.type})</span>`;
                 const input = document.createElement('input');
-                input.type = "number";
-                input.value = a.count;
-                input.className = "w-16 border rounded text-center bg-slate-50";
+                input.type = "number"; input.value = a.count; input.className = "w-16 border rounded text-center";
                 input.onchange = () => { t.assigned[i].count = parseInt(input.value) || 0; };
-                itemDiv.appendChild(nameSpan);
                 itemDiv.appendChild(input);
                 c.appendChild(itemDiv);
             });
-            if(t.assigned.length === 0) c.innerHTML = '<p class="text-center text-slate-400 py-4">此桌目前無分配資料</p>';
             document.getElementById('manage-modal').classList.remove('hidden');
         }
 
         function saveAndCloseManage() {
-            tables.forEach(t => { t.assigned = t.assigned.filter(a => a.count > 0); });
             document.getElementById('manage-modal').classList.add('hidden');
             renderCanvas();
-            renderSidebar();
-            save();
         }
 
-function save(){ 
-    localStorage.setItem('tailor_v13_data', JSON.stringify({
-        rawData, 
-        tables, 
-        deptAliases,
-        deptColors,
-        deptOrder // 關鍵：存入自訂順序
-    })); 
-}
-        function exportProject() { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({rawData, tables, deptAliases})], {type: 'application/json'})); a.download = `尾牙專案.json`; a.click(); }
-        function importProject(input) { const reader = new FileReader(); reader.onload = (e) => { const d = JSON.parse(e.target.result); rawData = d.rawData; tables = d.tables; deptAliases = d.deptAliases; renderCanvas(); }; reader.readAsText(input.files[0]); }
+        function setMode(m) { currentTableMode = m; document.getElementById('mode-normal').classList.toggle('btn-active-indigo', m==='normal'); document.getElementById('mode-main').classList.toggle('btn-active-orange', m==='main'); }
+        function setAssignType(t) { assignType = t; selectedDept = null; document.getElementById('btn-meat').classList.toggle('btn-active-indigo', t==='葷'); document.getElementById('btn-veg').classList.toggle('btn-active-green', t==='素'); renderSidebar(); }
+
+        function exportProject() { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({rawData, tables, deptAliases, deptColors, deptOrder})], {type: 'application/json'})); a.download = `尾牙專案.json`; a.click(); }
+        function importProject(input) { const reader = new FileReader(); reader.onload = (e) => { const d = JSON.parse(e.target.result); rawData = d.rawData; tables = d.tables; deptAliases = d.deptAliases; deptColors = d.deptColors || {}; deptOrder = d.deptOrder || []; renderCanvas(); }; reader.readAsText(input.files[0]); }
         function exportImage() { html2canvas(document.getElementById('capture-area'), { scale: 2 }).then(canvas => { const a = document.createElement('a'); a.download = `尾牙桌圖.png`; a.href = canvas.toDataURL(); a.click(); }); }
         
         function assignToTable(t) {
             const isVeg = (t.assigned||[]).some(a=>a.type==='素'), isMeat = (t.assigned||[]).some(a=>a.type==='葷');
             if((assignType==='素'&&isMeat) || (assignType==='葷'&&isVeg)) return alert("葷素不可併桌");
             const rem = getRemain(selectedDept, assignType);
-            const count = parseInt(prompt(`分配 ${selectedDept} 到第 ${t.displayId} 桌`, rem));
+            const count = parseInt(prompt(`分配 ${selectedDept} (${assignType}) 到 ${t.displayId} 桌`, rem));
             if(count > 0) {
                 const ex = t.assigned.find(a=>a.dept===selectedDept && a.type===assignType);
                 if(ex) ex.count += count; else t.assigned.push({dept:selectedDept, count, type:assignType});
@@ -449,34 +358,18 @@ function save(){
         }
 
         document.getElementById('excel-upload').onchange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-        const data = new Uint8Array(ev.target.result);
-        const workbook = XLSX.read(data, {type: 'array'});
-        const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {header:1});
-        
-        // 確保匯入前 tempRawData 是乾淨的，或依照需求追加
-        // 如果想清空舊的再匯入，可加：tempRawData = [];
-        
-        for(let i=1; i<rows.length; i++){
-            const r = rows[i];
-            if(!r || r.length < 1) continue;
-            tempRawData.push({
-                dept: String(r[0]||'').trim(),
-                group: String(r[1]||'').trim(),
-                id: String(r[2]||'').trim(),
-                name: String(r[3]||'').trim(),
-                diet: String(r[4]||'葷').trim()
-            });
-        }
-        renderDataTable(); // 刷新顯示
-        e.target.value = ''; // 【關鍵】清空 input 值，下次選同檔案才能再次觸發
-    };
-    reader.readAsArrayBuffer(file);
-};
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const workbook = XLSX.read(new Uint8Array(ev.target.result), {type: 'array'});
+                const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {header:1});
+                for(let i=1; i<rows.length; i++){
+                    const r = rows[i]; if(!r || r.length < 1) continue;
+                    tempRawData.push({ dept: String(r[0]||'').trim(), group: String(r[1]||'').trim(), id: String(r[2]||'').trim(), name: String(r[3]||'').trim(), diet: String(r[4]||'葷').trim() });
+                }
+                renderDataTable(); e.target.value = '';
+            };
+            reader.readAsArrayBuffer(e.target.files[0]);
+        };
 
         init();
     </script>
