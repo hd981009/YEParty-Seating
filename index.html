@@ -116,6 +116,7 @@
         const ROWS = 12, COLS = 19, WALKWAY_COL = 10;
         let rawData = [], tables = [], deptAliases = {}, deptColors = {};
         let tempRawData = []; 
+        let backupTables = []; // 新增這行，用來存放打開視窗前的桌位狀態
         let currentTableMode = 'normal', assignType = '葷', selectedDept = null, draggedTable = null;
 
         const PALETTE = ["#4f46e5", "#e11d48", "#8b5cf6", "#0ea5e9", "#f43f5e", "#d946ef", "#f59e0b", "#10b981", "#06b6d4", "#f97316", "#6366f1", "#ec4899", "#14b8a6", "#ef4444", "#a855f7", "#3b82f6", "#22c55e", "#eab308", "#64748b", "#475569"];
@@ -149,31 +150,69 @@
             return (type === '葷' ? stats.meat : stats.veg) - assigned;
         }
 
-        function openDataModal() {
-            tempRawData = JSON.parse(JSON.stringify(rawData)); 
-            document.getElementById('data-modal').classList.remove('hidden');
-            renderDataTable();
-        }
+// 進入時：同時備份名單與桌位
+function openDataModal() {
+    tempRawData = JSON.parse(JSON.stringify(rawData)); 
+    backupTables = JSON.parse(JSON.stringify(tables)); // 關鍵：拍照存檔
+    document.getElementById('data-modal').classList.remove('hidden');
+    renderDataTable();
+}
 
-        function cancelDataChanges() {
-            tempRawData = [];
-            document.getElementById('data-modal').classList.add('hidden');
-        }
+// 取代原本的 cancelDataChanges
+function cancelDataChanges() {
+    // 將桌位還原成進入視窗前的樣子
+    tables = JSON.parse(JSON.stringify(backupTables)); 
+    tempRawData = []; 
+    document.getElementById('data-modal').classList.add('hidden');
+    renderCanvas(); // 刷回舊圖
+    renderSidebar(); // 刷回舊清單
+}
 
-        function clearAllData() {
-    if (confirm("⚠️ 注意：這將會刪除名單並清空所有桌位分配！\n\n(桌子位置將會保留，但人數會歸零)")) {
-        tempRawData = []; // 清空彈窗內的暫存名單
-        rawData = [];     // 清空正式名單
-        
-        // 核心修改：保留桌子外殼，清空內部名單
+Gemini 說了
+建議採用**「取代」**的方式。因為這些修改涉及到邏輯的連動，如果只是單純往後疊加，舊的函數依然會存在，瀏覽器會優先執行舊的邏輯。
+
+請對照你的程式碼，將以下三個部分的舊函數完整替換掉：
+
+1. 變數宣告區 (取代原本的 let tempRawData = [];)
+在 <script> 最上方，請確保新增了 backupTables：
+
+JavaScript
+let tempRawData = []; 
+let backupTables = []; // 新增這行備份空間
+2. 取代 openDataModal 與 cancelDataChanges
+這兩個函數是「後悔藥」邏輯的核心，請直接取代舊的：
+
+JavaScript
+// 進入時：同時備份名單與桌位
+function openDataModal() {
+    tempRawData = JSON.parse(JSON.stringify(rawData)); 
+    backupTables = JSON.parse(JSON.stringify(tables)); // 關鍵：拍照存檔
+    document.getElementById('data-modal').classList.remove('hidden');
+    renderDataTable();
+}
+
+// 取代原本的 cancelDataChanges
+function cancelDataChanges() {
+    // 將桌位還原成進入視窗前的樣子
+    tables = JSON.parse(JSON.stringify(backupTables)); 
+    tempRawData = []; 
+    document.getElementById('data-modal').classList.add('hidden');
+    renderCanvas(); // 刷回舊圖
+    renderSidebar(); // 刷回舊清單
+}
+3. 取代 clearAllData (清空邏輯)
+這個版本會清空桌圖顯示，但不會立刻存檔：
+
+JavaScript
+function clearAllData() {
+    if (confirm("⚠️ 注意：這將會刪除名單並清空所有桌位分配！\n\n(若按『取消』可恢復原狀)")) {
+        tempRawData = []; 
         tables.forEach(t => {
             t.assigned = []; 
         });
-        
-        renderDataTable(); // 重新渲染表格（變空）
-        renderCanvas();    // 重新渲染桌圖（桌子變回灰色/初始狀態）
-        
-        alert("資料已完全清空。請按下上方的『儲存』以套用變更。");
+        renderDataTable(); 
+        renderCanvas(); 
+        renderSidebar();
     }
 }
 
@@ -191,16 +230,21 @@
         }
 
         function closeDataModal() {
-            let ids = tempRawData.map(r => r.id).filter(id => id !== "");
-            let hasDup = ids.some((id, index) => ids.indexOf(id) !== index);
-            if(hasDup) {
-                alert("員編有重複，請修正後再儲存！");
-                return;
-            }
-            rawData = JSON.parse(JSON.stringify(tempRawData)); 
-            document.getElementById('data-modal').classList.add('hidden');
-            renderCanvas();
-        }
+    // 檢查員編是否有重複
+    let ids = tempRawData.map(r => r.id).filter(id => id !== "");
+    let hasDup = ids.some((id, index) => ids.indexOf(id) !== index);
+    if(hasDup) {
+        alert("員編有重複，請修正後再儲存！");
+        return;
+    }
+    
+    rawData = JSON.parse(JSON.stringify(tempRawData)); // 正式定案
+    document.getElementById('data-modal').classList.add('hidden');
+    
+    save(); // 真正寫入硬碟儲存
+    renderCanvas();
+    renderSidebar();
+}
 
         function renderDataTable() {
             const tbody = document.getElementById('data-table-body');
