@@ -243,11 +243,12 @@ function getRemain(dName, type) {
                         const isVeg = (table.assigned||[]).some(a => a.type === '素');
                         const tableEl = document.createElement('div');
                         tableEl.draggable = true;
-                        tableEl.className = `w-[75px] h-[75px] rounded-full shadow-lg flex flex-col items-center justify-center text-white cursor-move relative border-2 border-white transition-all ${isVeg?'veg-table-style':''}`;
-                        if(!isVeg) tableEl.style.backgroundColor = table.type==='main' ? "#fed33c" : (table.assigned[0] ? getDeptColor(table.assigned[0].dept) : "#94a3b8");
-                        (table.assigned || []).filter(a => a.count > 0).slice(0, 2).forEach(a => {
-                            tableEl.innerHTML += `<div class="text-[13px] font-black leading-tight drop-shadow-md">${deptAliases[a.dept] || a.dept.substring(0, 2)}:${a.count}</div>`;
-                        });
+                        // 加入桌號標籤與內容
+tableEl.innerHTML = `<div class="table-id-tag">${table.displayId}</div>`;
+
+(table.assigned || []).filter(a => a.count > 0).slice(0, 2).forEach(a => {
+    tableEl.innerHTML += `<div class="text-[13px] font-black leading-tight drop-shadow-md">${deptAliases[a.dept] || a.dept.substring(0, 2)}:${a.count}</div>`;
+});
                         if(isVeg) tableEl.innerHTML += `<div class="veg-marker">素</div>`;
                         tableEl.onclick=()=>{ if(selectedDept) assignToTable(table); else openManageModal(table); };
                         tableEl.oncontextmenu=(e)=>{ e.preventDefault(); if(confirm('刪除桌位？')) { tables=tables.filter(t=>t!==table); renderCanvas(); } };
@@ -426,7 +427,25 @@ function autoSortVegFirst() {
             };
             reader.readAsArrayBuffer(e.target.files[0]);
         };
+function exportExcelList() {
+    if (rawData.length === 0) return alert("沒有名單可以匯出！");
+    
+    // 準備標題列
+    const data = [["單位 (部門)", "組別", "員編", "姓名", "飲食選擇"]];
+    
+    // 放入名單數據
+    rawData.forEach(item => {
+        data.push([item.dept, item.group, item.id, item.name, item.diet]);
+    });
 
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "員工名單");
+    
+    // 檔名加上今天的日期
+    const date = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb, `貿協尾牙名單_${date}.xlsx`);
+}
         init();
     </script>
 </body>
