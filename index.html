@@ -289,34 +289,54 @@
             document.getElementById('global-stats').innerText = `${assignType}食待排：${totalRem} 人`;
         }
 
-        function openManageModal(t) {
+       function openManageModal(t) {
     document.getElementById('modal-title').innerText = `管理 ${t.displayId} 號桌`;
     const c = document.getElementById('modal-content');
     c.innerHTML = '';
 
+    // 先過濾掉 0 人的資料，確保下次點進來時它們徹底消失
+    t.assigned = t.assigned.filter(a => a.count > 0);
+
     t.assigned.forEach((a, i) => {
         const itemDiv = document.createElement('div');
-        itemDiv.className = "p-3 bg-slate-100 rounded-xl flex justify-between items-center mb-2 font-bold";
-        itemDiv.innerHTML = `<span class="text-xs">${a.dept} (${a.type})</span>`;
+        itemDiv.className = "p-3 bg-white border-2 rounded-xl flex justify-between items-center mb-2 font-bold hover:border-indigo-400 transition-all";
+        
+        // 點擊部門名稱，將該部門移到陣列第一位，從而決定桌子顏色
+        const nameSpan = document.createElement('span');
+        nameSpan.className = "text-xs cursor-pointer text-indigo-600 underline";
+        nameSpan.innerText = `${a.dept} (${a.type})`;
+        nameSpan.title = "點擊以此部門顏色為準";
+        nameSpan.onclick = () => {
+            const picked = t.assigned.splice(i, 1)[0];
+            t.assigned.unshift(picked); // 移到最前面
+            openManageModal(t); // 刷新彈窗顯示順序
+        };
 
         const input = document.createElement('input');
         input.type = "number";
         input.value = a.count;
-        input.className = "w-16 border rounded text-center";
-        
-        // 關鍵：使用監聽器直接改寫原始物件 t
+        input.className = "w-16 border rounded text-center bg-slate-50";
         input.onchange = () => {
             t.assigned[i].count = parseInt(input.value) || 0;
         };
 
+        itemDiv.appendChild(nameSpan);
         itemDiv.appendChild(input);
         c.appendChild(itemDiv);
     });
+    
+    if(t.assigned.length === 0) c.innerHTML = '<p class="text-center text-slate-400 py-4">此桌目前無分配資料</p>';
     document.getElementById('manage-modal').classList.remove('hidden');
 }
         function saveAndCloseManage() {
+    // 取得當前正在編輯的桌子資料（假設我們在彈窗中有存取該桌子物件）
+    // 這裡我們直接對所有桌子做一次全面掃描，確保數據乾淨
+    tables.forEach(t => {
+        t.assigned = t.assigned.filter(a => a.count > 0);
+    });
+
     document.getElementById('manage-modal').classList.add('hidden');
-    renderCanvas();
+    renderCanvas(); // 當 t.assigned 長度為 0 時，renderCanvas 會自動跑 else 邏輯變回灰色
     renderSidebar();
     save();
 }
