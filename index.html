@@ -479,32 +479,35 @@ function autoSortVegFirst() {
     const captureArea = document.getElementById('capture-area');
     const scrollWrapper = document.getElementById('scroll-wrapper');
 
-    // 1. 暫存目前的捲軸位置
     const oldScrollTop = scrollWrapper.scrollTop;
     const oldScrollLeft = scrollWrapper.scrollLeft;
 
-    // 2. 將捲軸歸零（這是防止 html2canvas 座標偏移的關鍵）
     scrollWrapper.scrollTop = 0;
     scrollWrapper.scrollLeft = 0;
 
-    // 3. 執行截圖
-    html2canvas(captureArea, { 
-        scale: 2, 
-        useCORS: true,
-        backgroundColor: "#e2e8f0", // 確保背景顏色跟網頁一致
-        scrollY: 0, 
-        scrollX: 0
-    }).then(canvas => {
-        const a = document.createElement('a');
-        const date = new Date().toISOString().split('T')[0];
-        a.download = `貿協尾牙桌圖_${date}.png`;
-        a.href = canvas.toDataURL("image/png");
-        a.click();
-        
-        // 4. 還原捲軸位置，不影響使用者操作
-        scrollWrapper.scrollTop = oldScrollTop;
-        scrollWrapper.scrollLeft = oldScrollLeft;
-    });
+    // 增加一個小延遲，確保瀏覽器重新渲染佈局後再截圖
+    setTimeout(() => {
+        html2canvas(captureArea, { 
+            scale: 2, 
+            useCORS: true,
+            backgroundColor: "#e2e8f0",
+            scrollY: 0, 
+            scrollX: 0,
+            // 新增這兩行優化參數
+            logging: false,
+            width: captureArea.offsetWidth,
+            height: captureArea.offsetHeight
+        }).then(canvas => {
+            const a = document.createElement('a');
+            const date = new Date().toISOString().split('T')[0];
+            a.download = `貿協尾牙桌圖_${date}.png`;
+            a.href = canvas.toDataURL("image/png");
+            a.click();
+            
+            scrollWrapper.scrollTop = oldScrollTop;
+            scrollWrapper.scrollLeft = oldScrollLeft;
+        });
+    }, 100); 
 }
         
         function assignToTable(t) {
