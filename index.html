@@ -307,8 +307,8 @@ function clearAllData() {
         function renderSidebar() {
             const list = document.getElementById('dept-list'), s = getStats();
             list.innerHTML = '';
-            const sortedDepts = Object.keys(s).sort((a,b)=>getRemain(b,assignType)-getRemain(a,assignType));
-            sortedDepts.forEach(d => {
+           const sortedDepts = Object.keys(s); 
+sortedDepts.forEach(d => {
                 const rem = getRemain(d, assignType);
                 const isSel = selectedDept===d;
                 const div = document.createElement('div');
