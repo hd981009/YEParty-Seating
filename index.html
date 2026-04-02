@@ -257,14 +257,20 @@ function getRemain(dName, type) {
                         
                         // 顏色邏輯修正：主桌固定為橘黃色，一般桌空桌為灰色
                         if(!isVeg) {
-                            if (table.type === 'main') {
-                                tableEl.style.backgroundColor = "#fbbf24"; // 主桌專用橘黃色
-                            } else if (!hasPeople) {
-                                tableEl.style.backgroundColor = "#cbd5e1"; // 一般空桌顯示灰色
-                            } else {
-                                // 一般桌有排人，取第一筆部門的顏色
-                                tableEl.style.backgroundColor = getDeptColor(table.assigned[0].dept);
-                            }
+                         if (table.type === 'main') {
+        tableEl.style.backgroundColor = "#fbbf24"; // 主桌專用橘黃色
+    } else if (!hasPeople) {
+        tableEl.style.backgroundColor = "#cbd5e1"; // 一般空桌顯示灰色
+    } else {
+        // --- 核心修正處 ---
+        // 1. 檢查是否有手動選定的 primaryDept，且該部門是否還在這一桌的名單內
+        const primaryExists = table.assigned.some(a => a.dept === table.primaryDept && a.count > 0);
+        
+        // 2. 決定要抓哪一個單位的顏色：有手動選定就用手動的，沒有就抓第一筆
+        const targetDept = primaryExists ? table.primaryDept : table.assigned[0].dept;
+        
+        tableEl.style.backgroundColor = getDeptColor(targetDept);
+    }
                         }
 
                         // 顯示桌號標籤
@@ -358,22 +364,46 @@ function getRemain(dName, type) {
         }
 
         function openManageModal(t) {
-            document.getElementById('modal-title').innerText = `管理 ${t.displayId} 號桌`;
-            const c = document.getElementById('modal-content'); c.innerHTML = '';
-            t.assigned = t.assigned.filter(a => a.count > 0);
-            t.assigned.forEach((a, i) => {
-                const itemDiv = document.createElement('div');
-                itemDiv.className = "p-3 bg-white border-2 rounded-xl flex justify-between items-center mb-2 font-bold";
-                itemDiv.innerHTML = `<span class="text-sm text-indigo-600">${a.dept} (${a.type})</span>`;
-                const input = document.createElement('input');
-                input.type = "number"; input.value = a.count; input.className = "w-16 border rounded text-center";
-                input.onchange = () => { t.assigned[i].count = parseInt(input.value) || 0; };
-                itemDiv.appendChild(input);
-                c.appendChild(itemDiv);
-            });
-            document.getElementById('manage-modal').classList.remove('hidden');
-        }
+    document.getElementById('modal-title').innerText = `管理 ${t.displayId} 號桌`;
+    const c = document.getElementById('modal-content'); 
+    c.innerHTML = '<p class="text-xs text-slate-400 mb-2">💡 點擊部門名稱可切換桌子代表色</p>';
+    
+    t.assigned = (t.assigned || []).filter(a => a.count > 0);
+    
+    t.assigned.forEach((a, i) => {
+        const itemDiv = document.createElement('div');
+        // 判斷是否為目前選定的主色，若是則加強邊框
+        const isPrimary = (t.primaryDept === a.dept) || (!t.primaryDept && i === 0);
+        
+        itemDiv.className = `p-3 border-2 rounded-xl flex justify-between items-center mb-2 font-bold cursor-pointer transition-all ${isPrimary ? 'border-indigo-600 bg-indigo-50' : 'bg-white border-slate-100 opacity-70'}`;
+        
+        // 點擊整列即可切換主色
+        itemDiv.onclick = () => {
+            t.primaryDept = a.dept; 
+            openManageModal(t); // 重新刷一下 Modal 顯示選中狀態
+        };
 
+        const label = document.createElement('div');
+        label.className = "flex items-center gap-2";
+        label.innerHTML = `
+            <div class="w-4 h-4 rounded-full" style="background-color:${getDeptColor(a.dept)}"></div>
+            <span class="text-sm">${a.dept} (${a.type})</span>
+        `;
+
+        const input = document.createElement('input');
+        input.type = "number"; 
+        input.value = a.count; 
+        input.className = "w-16 border rounded text-center font-bold px-1";
+        // 防止輸入時觸發父層的 onclick
+        input.onclick = (e) => e.stopPropagation();
+        input.onchange = () => { t.assigned[i].count = parseInt(input.value) || 0; };
+        
+        itemDiv.appendChild(label);
+        itemDiv.appendChild(input);
+        c.appendChild(itemDiv);
+    });
+    document.getElementById('manage-modal').classList.remove('hidden');
+}
         function saveAndCloseManage() {
             document.getElementById('manage-modal').classList.add('hidden');
             renderCanvas();
