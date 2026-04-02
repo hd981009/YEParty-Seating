@@ -161,13 +161,21 @@
         }
 
         function clearAllData() {
-            if (confirm("⚠️ 注意：這將會刪除系統內『所有』名單資料！\n\n您確定要執行嗎？")) {
-                tempRawData = []; 
-                rawData = [];     
-                renderDataTable();
-                alert("資料已清空。請按下上方的『儲存』以套用變更。");
-            }
-        }
+    if (confirm("⚠️ 注意：這將會刪除名單並清空所有桌位分配！\n\n(桌子位置將會保留，但人數會歸零)")) {
+        tempRawData = []; // 清空彈窗內的暫存名單
+        rawData = [];     // 清空正式名單
+        
+        // 核心修改：保留桌子外殼，清空內部名單
+        tables.forEach(t => {
+            t.assigned = []; 
+        });
+        
+        renderDataTable(); // 重新渲染表格（變空）
+        renderCanvas();    // 重新渲染桌圖（桌子變回灰色/初始狀態）
+        
+        alert("資料已完全清空。請按下上方的『儲存』以套用變更。");
+    }
+}
 
         function exportExcelList() {
             const targetData = (document.getElementById('data-modal').classList.contains('hidden')) ? rawData : tempRawData;
@@ -380,26 +388,34 @@ div.oncontextmenu = (e) => {
         }
 
         document.getElementById('excel-upload').onchange = (e) => {
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                const data = new Uint8Array(ev.target.result);
-                const workbook = XLSX.read(data, {type: 'array'});
-                const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {header:1});
-                for(let i=1; i<rows.length; i++){
-                    const r = rows[i];
-                    if(!r || r.length < 1) continue;
-                    tempRawData.push({
-                        dept: String(r[0]||'').trim(),
-                        group: String(r[1]||'').trim(),
-                        id: String(r[2]||'').trim(),
-                        name: String(r[3]||'').trim(),
-                        diet: String(r[4]||'葷').trim()
-                    });
-                }
-                renderDataTable();
-            };
-            reader.readAsArrayBuffer(e.target.files[0]);
-        };
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+        const data = new Uint8Array(ev.target.result);
+        const workbook = XLSX.read(data, {type: 'array'});
+        const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {header:1});
+        
+        // 確保匯入前 tempRawData 是乾淨的，或依照需求追加
+        // 如果想清空舊的再匯入，可加：tempRawData = [];
+        
+        for(let i=1; i<rows.length; i++){
+            const r = rows[i];
+            if(!r || r.length < 1) continue;
+            tempRawData.push({
+                dept: String(r[0]||'').trim(),
+                group: String(r[1]||'').trim(),
+                id: String(r[2]||'').trim(),
+                name: String(r[3]||'').trim(),
+                diet: String(r[4]||'葷').trim()
+            });
+        }
+        renderDataTable(); // 刷新顯示
+        e.target.value = ''; // 【關鍵】清空 input 值，下次選同檔案才能再次觸發
+    };
+    reader.readAsArrayBuffer(file);
+};
 
         init();
     </script>
