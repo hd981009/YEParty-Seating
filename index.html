@@ -150,60 +150,23 @@
             return (type === '葷' ? stats.meat : stats.veg) - assigned;
         }
 
-// 進入時：同時備份名單與桌位
+// 1. 修正後的數據中心開啟與取消
 function openDataModal() {
     tempRawData = JSON.parse(JSON.stringify(rawData)); 
-    backupTables = JSON.parse(JSON.stringify(tables)); // 關鍵：拍照存檔
+    backupTables = JSON.parse(JSON.stringify(tables)); 
     document.getElementById('data-modal').classList.remove('hidden');
     renderDataTable();
 }
 
-// 取代原本的 cancelDataChanges
 function cancelDataChanges() {
-    // 將桌位還原成進入視窗前的樣子
     tables = JSON.parse(JSON.stringify(backupTables)); 
     tempRawData = []; 
     document.getElementById('data-modal').classList.add('hidden');
-    renderCanvas(); // 刷回舊圖
-    renderSidebar(); // 刷回舊清單
+    renderCanvas();
+    renderSidebar();
 }
 
-Gemini 說了
-建議採用**「取代」**的方式。因為這些修改涉及到邏輯的連動，如果只是單純往後疊加，舊的函數依然會存在，瀏覽器會優先執行舊的邏輯。
-
-請對照你的程式碼，將以下三個部分的舊函數完整替換掉：
-
-1. 變數宣告區 (取代原本的 let tempRawData = [];)
-在 <script> 最上方，請確保新增了 backupTables：
-
-JavaScript
-let tempRawData = []; 
-let backupTables = []; // 新增這行備份空間
-2. 取代 openDataModal 與 cancelDataChanges
-這兩個函數是「後悔藥」邏輯的核心，請直接取代舊的：
-
-JavaScript
-// 進入時：同時備份名單與桌位
-function openDataModal() {
-    tempRawData = JSON.parse(JSON.stringify(rawData)); 
-    backupTables = JSON.parse(JSON.stringify(tables)); // 關鍵：拍照存檔
-    document.getElementById('data-modal').classList.remove('hidden');
-    renderDataTable();
-}
-
-// 取代原本的 cancelDataChanges
-function cancelDataChanges() {
-    // 將桌位還原成進入視窗前的樣子
-    tables = JSON.parse(JSON.stringify(backupTables)); 
-    tempRawData = []; 
-    document.getElementById('data-modal').classList.add('hidden');
-    renderCanvas(); // 刷回舊圖
-    renderSidebar(); // 刷回舊清單
-}
-3. 取代 clearAllData (清空邏輯)
-這個版本會清空桌圖顯示，但不會立刻存檔：
-
-JavaScript
+// 2. 修正後的清空邏輯 (請取代原本的 clearAllData)
 function clearAllData() {
     if (confirm("⚠️ 注意：這將會刪除名單並清空所有桌位分配！\n\n(若按『取消』可恢復原狀)")) {
         tempRawData = []; 
@@ -215,7 +178,6 @@ function clearAllData() {
         renderSidebar();
     }
 }
-
         function exportExcelList() {
             const targetData = (document.getElementById('data-modal').classList.contains('hidden')) ? rawData : tempRawData;
             if (targetData.length === 0) return alert("目前沒有名單資料可匯出！");
