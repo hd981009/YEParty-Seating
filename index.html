@@ -461,19 +461,31 @@ function autoSortVegFirst() {
     }; 
     reader.readAsText(input.files[0]); 
 }
-        function exportImage() { html2canvas(document.getElementById('capture-area'), { scale: 2 }).then(canvas => { const a = document.createElement('a'); a.download = `尾牙桌圖.png`; a.href = canvas.toDataURL(); a.click(); }); }
+        function exportImage() {
+    // 1. 先將捲軸拉回最上方，避免 html2canvas 計算座標偏移
+    const scrollWrapper = document.getElementById('scroll-wrapper');
+    const oldScrollTop = scrollWrapper.scrollTop;
+    scrollWrapper.scrollTop = 0;
+
+    // 2. 執行截圖
+    html2canvas(document.getElementById('capture-area'), { 
+        scale: 2,           // 提高清晰度
+        useCORS: true,      // 允許跨域圖片
+        allowTaint: true,
+        scrollY: -window.scrollY, // 強制座標對齊
+        scrollX: -window.scrollX,
+        backgroundColor: "#e2e8f0" // 確保背景色一致 (Slate-200)
+    }).then(canvas => {
+        const a = document.createElement('a');
+        const date = new Date().toISOString().split('T')[0];
+        a.download = `貿協尾牙桌圖_${date}.png`;
+        a.href = canvas.toDataURL("image/png");
+        a.click();
         
-        function assignToTable(t) {
-            const isVeg = (t.assigned||[]).some(a=>a.type==='素'), isMeat = (t.assigned||[]).some(a=>a.type==='葷');
-            if((assignType==='素'&&isMeat) || (assignType==='葷'&&isVeg)) return alert("葷素不可併桌");
-            const rem = getRemain(selectedDept, assignType);
-            const count = parseInt(prompt(`分配 ${selectedDept} (${assignType}) 到 ${t.displayId} 桌`, rem));
-            if(count > 0) {
-                const ex = t.assigned.find(a=>a.dept===selectedDept && a.type===assignType);
-                if(ex) ex.count += count; else t.assigned.push({dept:selectedDept, count, type:assignType});
-                selectedDept = null; renderCanvas();
-            }
-        }
+        // 3. 截完後把捲軸還原到原本的位置
+        scrollWrapper.scrollTop = oldScrollTop;
+    });
+}
 
         document.getElementById('excel-upload').onchange = (e) => {
             const reader = new FileReader();
