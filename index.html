@@ -2,43 +2,31 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <title>尾牙排座系統 V13.5 - 完整修復版</title>
+    <title>尾牙排座系統 V13.6 - 資料核心回歸版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         .grid-cell { width: 85px; height: 85px; }
-        .canvas-container { 
-            display: grid; 
-            grid-template-columns: repeat(19, 85px); 
-            gap: 10px; 
-            padding: 40px;
-            width: max-content; /* 確保寬度由內容撐開 */
-        }
-        
+        .canvas-container { display: grid; grid-template-columns: repeat(19, 85px); gap: 10px; padding: 40px; width: max-content; }
         .status-over { border: 4px solid #ef4444 !important; animation: pulse 1s infinite; }
         @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
-        
         .veg-table-style { background-color: #16a34a !important; border: 2px solid white !important; }
         .veg-marker { position: absolute; bottom: -4px; right: -4px; background: #22c55e; color: white; border-radius: 50%; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; font-size: 14px; border: 2px solid white; font-weight: bold; z-index: 20; }
-        
         .table-id-tag { position: absolute; top: -12px; background: #1e293b; padding: 2px 10px; border-radius: 14px; font-size: 13px; color: white; z-index: 10; font-weight: bold; border: 2px solid white; }
         .modal-bg { background-color: rgba(0,0,0,0.7); backdrop-filter: blur(5px); }
         #scroll-wrapper { overflow: auto !important; height: 100vh; flex-grow: 1; }
-        
-        /* 舞台對齊修正 */
-        .stage-container {
-            width: 100%;
-            display: flex;
-            justify-content: center;
-            margin-bottom: 2rem;
-        }
+        .stage-container { width: 100%; display: flex; justify-content: center; margin-bottom: 2rem; }
+
+        /* 待排部門卡片 - 字體加大 (您可以在這裡調整) */
+        .dept-name { font-size: 1.125rem; font-weight: 900; } /* text-lg */
+        .dept-count { font-size: 1rem; font-weight: 700; }    /* text-base */
     </style>
 </head>
 <body class="bg-slate-100 font-sans min-h-screen flex text-slate-800 overflow-hidden" oncontextmenu="return false;">
 
     <div class="w-96 bg-white shadow-2xl h-screen flex flex-col border-r z-50 p-5 flex-shrink-0">
-        <h1 class="text-2xl font-black text-indigo-600 mb-4">尾牙排座 V13.5</h1>
+        <h1 class="text-2xl font-black text-indigo-600 mb-4">尾牙排座 V13.6</h1>
 
         <div class="grid grid-cols-2 gap-2 mb-4">
             <button onclick="setMode('normal')" id="mode-normal" class="py-3 rounded-xl bg-indigo-600 text-white font-bold shadow-lg text-sm">一般桌 (10人)</button>
@@ -51,15 +39,18 @@
         </div>
 
         <div class="flex-1 overflow-y-auto border-t pt-4">
-            <h3 class="font-black text-slate-400 text-[10px] tracking-widest mb-3 uppercase">待排部門</h3>
-            <div id="dept-list" class="space-y-2 pb-10"></div>
+            <div class="flex justify-between items-end mb-3">
+                <h3 class="font-black text-slate-400 text-[10px] tracking-widest uppercase">待排部門 (點擊選取)</h3>
+                <span id="global-stats" class="text-[10px] font-bold text-indigo-500"></span>
+            </div>
+            <div id="dept-list" class="space-y-3 pb-10"></div>
         </div>
         
         <div class="pt-4 border-t grid grid-cols-2 gap-2">
-            <button onclick="openDataModal()" class="py-2 bg-slate-800 text-white rounded text-[10px] font-bold">名單管理</button>
-            <button onclick="exportImage()" class="py-2 bg-emerald-600 text-white rounded text-[10px] font-bold">匯出圖片</button>
-            <button onclick="exportProject()" class="py-2 border border-slate-300 rounded text-[10px]">匯出專案</button>
-            <button onclick="document.getElementById('import-project').click()" class="py-2 border border-slate-300 rounded text-[10px]">匯入專案</button>
+            <button onclick="openDataModal()" class="py-3 bg-slate-800 text-white rounded-xl text-xs font-bold shadow-md">名單/Excel管理</button>
+            <button onclick="exportImage()" class="py-3 bg-emerald-600 text-white rounded-xl text-xs font-bold shadow-md">匯出桌圖PNG</button>
+            <button onclick="exportProject()" class="py-2 border border-slate-300 rounded text-[10px]">儲存專案</button>
+            <button onclick="document.getElementById('import-project').click()" class="py-2 border border-slate-300 rounded text-[10px]">讀取專案</button>
             <input type="file" id="import-project" class="hidden" accept=".json" onchange="importProject(this)"/>
         </div>
     </div>
@@ -69,8 +60,38 @@
             <div class="stage-container">
                 <div class="w-[800px] h-14 bg-slate-900 text-white flex items-center justify-center rounded-b-3xl font-bold text-2xl tracking-[2em] border-x-8 border-indigo-500 shadow-xl">STAGE 舞台</div>
             </div>
-            
             <div id="canvas" class="canvas-container bg-white rounded-[40px] shadow-2xl border border-slate-300 mx-auto"></div>
+        </div>
+    </div>
+
+    <div id="data-modal" class="hidden fixed inset-0 modal-bg flex items-center justify-center z-[100]">
+        <div class="bg-white rounded-3xl shadow-2xl w-[90%] h-[85%] flex flex-col p-8">
+            <div class="flex justify-between items-start mb-6">
+                <div>
+                    <h3 class="text-2xl font-black">名單數據中心</h3>
+                    <p class="text-sm text-red-500 font-bold hidden" id="id-error">⚠️ 員編重複！請檢查紅色欄位</p>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="document.getElementById('excel-upload').click()" class="px-5 py-2 bg-indigo-600 text-white rounded-xl font-bold">Excel 匯入</button>
+                    <input type="file" id="excel-upload" class="hidden" accept=".xlsx, .xls"/>
+                    <button onclick="addRow()" class="px-5 py-2 border-2 border-indigo-600 text-indigo-600 rounded-xl font-bold">＋ 新增同仁</button>
+                    <button onclick="closeDataModal()" class="px-5 py-2 bg-slate-900 text-white rounded-xl font-bold">完成並儲存</button>
+                </div>
+            </div>
+            <div class="flex-1 overflow-auto border rounded-2xl">
+                <table class="w-full text-left">
+                    <thead class="bg-slate-100 sticky top-0 font-bold text-sm text-slate-600">
+                        <tr>
+                            <th class="p-4">部門 (必填)</th>
+                            <th class="p-4">員編 (唯一)</th>
+                            <th class="p-4">姓名</th>
+                            <th class="p-4">飲食 (葷/素)</th>
+                            <th class="p-4 text-center">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="data-table-body" class="divide-y"></tbody>
+                </table>
+            </div>
         </div>
     </div>
 
@@ -82,27 +103,12 @@
         </div>
     </div>
 
-    <div id="data-modal" class="hidden fixed inset-0 modal-bg flex items-center justify-center z-[100]">
-        <div class="bg-white rounded-3xl shadow-2xl w-[90%] h-[85%] flex flex-col p-8">
-            <div class="flex justify-between items-start mb-6">
-                <h3 class="text-2xl font-black">名單數據中心</h3>
-                <button onclick="closeDataModal()" class="px-5 py-2 bg-slate-900 text-white rounded-xl font-bold">儲存並關閉</button>
-            </div>
-            <div class="flex-1 overflow-auto border rounded-2xl"><table class="w-full text-left"><thead class="bg-slate-100 sticky top-0"><tr><th class="p-4">單位</th><th class="p-4">員編</th><th class="p-4">姓名</th><th class="p-4">飲食</th><th class="p-4">刪除</th></tr></thead><tbody id="data-table-body" class="divide-y"></tbody></table></div>
-        </div>
-    </div>
-
     <script>
         const ROWS = 12, COLS = 19, WALKWAY_COL = 10;
         let rawData = [], tables = [], deptAliases = {}, deptColors = {};
         let currentTableMode = 'normal', assignType = '葷', selectedDept = null, draggedTable = null;
 
-        // 擴充的高對比調色盤 (20色)，避免顏色重複
-        const PALETTE = [
-            "#4f46e5", "#e11d48", "#8b5cf6", "#0ea5e9", "#f43f5e", "#d946ef", "#f59e0b", "#10b981",
-            "#06b6d4", "#f97316", "#6366f1", "#ec4899", "#14b8a6", "#ef4444", "#a855f7", "#3b82f6",
-            "#22c55e", "#eab308", "#64748b", "#475569"
-        ];
+        const PALETTE = ["#4f46e5", "#e11d48", "#8b5cf6", "#0ea5e9", "#f43f5e", "#d946ef", "#f59e0b", "#10b981", "#06b6d4", "#f97316", "#6366f1", "#ec4899", "#14b8a6", "#ef4444", "#a855f7", "#3b82f6", "#22c55e", "#eab308", "#64748b", "#475569"];
 
         function init() {
             const saved = localStorage.getItem('tailor_v13_data');
@@ -113,9 +119,11 @@
             renderCanvas();
         }
 
+        // --- 核心邏輯：計算剩餘人數 ---
         function getStats() {
             let s = {};
             rawData.forEach(d => {
+                if(!d.dept) return;
                 if(!s[d.dept]) {
                     s[d.dept] = { meat: 0, veg: 0 };
                     if(!deptColors[d.dept]) deptColors[d.dept] = PALETTE[Object.keys(deptColors).length % PALETTE.length];
@@ -132,54 +140,92 @@
             return (type === '葷' ? stats.meat : stats.veg) - assigned;
         }
 
+        // --- 名單管理：手寫與防呆 ---
+        function renderDataTable() {
+            const tbody = document.getElementById('data-table-body');
+            tbody.innerHTML = '';
+            let ids = rawData.map(r => r.id);
+            let hasDup = false;
+
+            rawData.forEach((item, index) => {
+                const isDup = item.id && ids.filter(x => x === item.id).length > 1;
+                if(isDup) hasDup = true;
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="p-2"><input class="w-full border-b p-1" value="${item.dept}" onchange="rawData[${index}].dept=this.value"></td>
+                    <td class="p-2"><input class="w-full border-b p-1 font-bold ${isDup?'text-red-600 bg-red-50':''}" value="${item.id}" onchange="rawData[${index}].id=this.value;renderDataTable()"></td>
+                    <td class="p-2"><input class="w-full border-b p-1" value="${item.name}" onchange="rawData[${index}].name=this.value"></td>
+                    <td class="p-2"><input class="w-full border-b p-1" value="${item.diet}" placeholder="葷/素" onchange="rawData[${index}].diet=this.value"></td>
+                    <td class="p-2 text-center"><button onclick="rawData.splice(${index},1);renderDataTable()" class="text-red-400 hover:text-red-600">✕ 刪除</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+            document.getElementById('id-error').classList.toggle('hidden', !hasDup);
+        }
+
+        function addRow() {
+            rawData.unshift({ dept: '新部門', id: '', name: '', diet: '葷' });
+            renderDataTable();
+        }
+
+        // --- 側邊欄：大字體介面 ---
+        function renderSidebar() {
+            const list = document.getElementById('dept-list'), s = getStats();
+            list.innerHTML = '';
+            const sortedDepts = Object.keys(s).sort((a,b)=>getRemain(b,assignType)-getRemain(a,assignType));
+
+            sortedDepts.forEach(d => {
+                const rem = getRemain(d, assignType);
+                const isSel = selectedDept===d;
+                const div = document.createElement('div');
+                const bgStyle = rem > 0 ? 'bg-white shadow-md border-slate-200' : 'bg-slate-50 opacity-30 border-transparent';
+                
+                div.className = `p-4 rounded-2xl border-2 cursor-pointer transition-all border-l-[12px] flex items-center justify-between ${isSel?'ring-4 ring-indigo-500 scale-105 z-10':''} ${bgStyle}`;
+                div.style.borderLeftColor = deptColors[d]; 
+                
+                div.innerHTML = `
+                    <span class="dept-name text-slate-800">${d}</span>
+                    <span class="dept-count bg-slate-100 px-3 py-1 rounded-lg text-indigo-600">${rem} 人</span>
+                `;
+                
+                div.onclick=()=>{ if(rem>0) {selectedDept=(selectedDept===d?null:d); renderSidebar();}};
+                div.oncontextmenu=(e)=>{ e.preventDefault(); const a=prompt(`修改簡稱:`, deptAliases[d]||d.substring(0,2)); if(a) {deptAliases[d]=a; renderCanvas();}};
+                list.appendChild(div);
+            });
+            
+            let totalRem = 0; Object.keys(s).forEach(d => totalRem += getRemain(d, assignType));
+            document.getElementById('global-stats').innerText = `${assignType}食待排：${totalRem} 人`;
+        }
+
+        // --- 畫布渲染與拖拉交換 (同 V13.5) ---
         function renderCanvas() {
             tables.sort((a,b)=>a.r!==b.r?a.r-b.r:a.c-b.c);
             let n=1, m=1; tables.forEach(t=>{t.displayId=t.type==='main'?`M${m++}`:n++; t.capacity=t.type==='main'?12:10;});
             const canvas = document.getElementById('canvas'); canvas.innerHTML = '';
-            
             for(let r=1; r<=ROWS; r++){
                 for(let c=1; c<=COLS; c++){
                     const cell = document.createElement('div');
                     cell.className = `grid-cell rounded-full flex items-center justify-center relative ${c===WALKWAY_COL?'bg-slate-50':''}`;
-                    
-                    // 註冊拖放目的地事件
                     cell.ondragover = (e) => e.preventDefault();
                     cell.ondrop = () => handleDrop(r, c);
-
                     const table = tables.find(t=>t.r===r && t.c===c);
                     if(table){
                         const total = (table.assigned||[]).reduce((s,a)=>s+a.count,0);
                         const isVeg = (table.assigned||[]).some(a => a.type === '素');
                         const tableEl = document.createElement('div');
-                        
                         tableEl.draggable = true;
                         tableEl.className = `w-[75px] h-[75px] rounded-full shadow-lg flex flex-col items-center justify-center text-white cursor-move relative border-2 border-white transition-all`;
-                        
-                        // 顏色邏輯
-                        if(isVeg) {
-                            tableEl.className += " veg-table-style";
-                        } else if(table.type === 'main') {
-                            tableEl.style.backgroundColor = "#f97316"; 
-                        } else {
-                            const mainDept = table.assigned.length > 0 ? table.assigned[0].dept : null;
-                            tableEl.style.backgroundColor = mainDept ? deptColors[mainDept] : "#94a3b8";
-                        }
-
+                        if(isVeg) tableEl.className += " veg-table-style";
+                        else if(table.type === 'main') tableEl.style.backgroundColor = "#f97316"; 
+                        else { const mainDept = table.assigned.length > 0 ? table.assigned[0].dept : null; tableEl.style.backgroundColor = mainDept ? deptColors[mainDept] : "#94a3b8"; }
                         if(total > table.capacity) tableEl.className += " status-over";
                         tableEl.innerHTML = `<div class="table-id-tag">${table.displayId}</div>`;
-                        (table.assigned||[]).slice(0,2).forEach(a=>{
-                            const alias = deptAliases[a.dept] || a.dept.substring(0,2);
-                            tableEl.innerHTML += `<div class="text-[12px] font-black leading-tight drop-shadow-md">${alias}:${a.count}</div>`;
-                        });
+                        (table.assigned||[]).slice(0,2).forEach(a=>{ tableEl.innerHTML += `<div class="text-[12px] font-black leading-tight drop-shadow-md">${deptAliases[a.dept]||a.dept.substring(0,2)}:${a.count}</div>`; });
                         if(isVeg) tableEl.innerHTML += `<div class="veg-marker">素</div>`;
-                        
                         tableEl.onclick=()=>{ if(selectedDept) assignToTable(table); else openManageModal(table); };
                         tableEl.oncontextmenu=(e)=>{ e.preventDefault(); if(confirm('刪除？')) tables = tables.filter(t=>t!==table); renderCanvas(); };
-                        
-                        // 拖拉開始
                         tableEl.ondragstart = () => { draggedTable = table; tableEl.style.opacity = "0.4"; };
                         tableEl.ondragend = () => { draggedTable = null; renderCanvas(); };
-
                         cell.appendChild(tableEl);
                     } else {
                         cell.className += " border border-dashed border-slate-200 hover:bg-indigo-50 cursor-pointer";
@@ -191,65 +237,35 @@
             renderSidebar(); save();
         }
 
-        // 拖拉交換核心邏輯
         function handleDrop(r, c) {
             if(!draggedTable) return;
             const targetTable = tables.find(t => t.r === r && t.c === c);
-            if(targetTable){
-                // 交換位置
-                const oldR = draggedTable.r; const oldC = draggedTable.c;
-                draggedTable.r = r; draggedTable.c = c;
-                targetTable.r = oldR; targetTable.c = oldC;
-            } else {
-                // 移動到空位
-                draggedTable.r = r; draggedTable.c = c;
-            }
+            if(targetTable){ const oldR = draggedTable.r; const oldC = draggedTable.c; draggedTable.r = r; draggedTable.c = c; targetTable.r = oldR; targetTable.c = oldC; }
+            else { draggedTable.r = r; draggedTable.c = c; }
             renderCanvas();
         }
 
-        function renderSidebar() {
-            const list = document.getElementById('dept-list'), s = getStats();
-            list.innerHTML = '';
-            const sortedDepts = Object.keys(s).sort((a,b)=>getRemain(b,assignType)-getRemain(a,assignType));
-
-            sortedDepts.forEach(d => {
-                const rem = getRemain(d, assignType);
-                const isSel = selectedDept===d;
-                const div = document.createElement('div');
-                const bgStyle = rem > 0 ? 'bg-white shadow-sm border-slate-200' : 'bg-slate-50 opacity-30 border-transparent';
-                
-                div.className = `p-3 rounded-xl border-2 cursor-pointer transition-all border-l-[10px] ${isSel?'ring-4 ring-indigo-400 scale-105 z-10':''} ${bgStyle}`;
-                div.style.borderLeftColor = deptColors[d]; 
-                div.innerHTML = `<div class="flex justify-between items-center"><span class="font-black text-slate-700">${d}</span><span class="bg-slate-100 px-2 py-1 rounded text-xs font-mono">${rem}人</span></div>`;
-                
-                div.onclick=()=>{ if(rem>0) {selectedDept=(selectedDept===d?null:d); renderSidebar();}};
-                div.oncontextmenu=(e)=>{ e.preventDefault(); const a=prompt(`簡稱:`, deptAliases[d]||d.substring(0,2)); if(a) {deptAliases[d]=a; renderCanvas();}};
-                list.appendChild(div);
-            });
-        }
-
-        // 工具函數 (其餘邏輯維持 V13.4)
-        function openManageModal(t){ /* ...同前版本... */ 
-            document.getElementById('modal-title').innerText = `管理桌位 ${t.displayId}`;
+        // --- 其他工具 ---
+        function openManageModal(t){
+            document.getElementById('modal-title').innerText = `管理 ${t.displayId}`;
             const c = document.getElementById('modal-content'); c.innerHTML = '';
             t.assigned.forEach((a,i)=>{
-                c.innerHTML += `<div class="p-3 bg-slate-100 rounded-xl flex justify-between items-center mb-2">
-                <span class="font-bold text-xs">${a.dept}</span>
-                <input type="number" value="${a.count}" class="w-16 border rounded text-center" onchange="tables.find(tbl=>tbl.displayId=='${t.displayId}').assigned[${i}].count=parseInt(this.value)">
-                </div>`;
+                c.innerHTML += `<div class="p-3 bg-slate-100 rounded-xl flex justify-between items-center mb-2"><span class="font-bold text-xs">${a.dept} (${a.type})</span><input type="number" value="${a.count}" class="w-16 border rounded text-center" onchange="t.assigned[${i}].count=parseInt(this.value)"></div>`;
             });
             document.getElementById('manage-modal').classList.remove('hidden');
         }
         function saveAndCloseManage(){ document.getElementById('manage-modal').classList.add('hidden'); renderCanvas(); }
         function setMode(m){ currentTableMode=m; renderCanvas(); }
         function setAssignType(t){ assignType=t; selectedDept=null; renderSidebar(); }
+        function openDataModal(){ document.getElementById('data-modal').classList.remove('hidden'); renderDataTable(); }
+        function closeDataModal(){ document.getElementById('data-modal').classList.add('hidden'); renderCanvas(); }
         function save(){ localStorage.setItem('tailor_v13_data', JSON.stringify({rawData, tables, deptAliases})); }
         function exportProject() { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({rawData, tables, deptAliases})], {type: 'application/json'})); a.download = `尾牙專案.json`; a.click(); }
         function importProject(input) { const reader = new FileReader(); reader.onload = (e) => { const d = JSON.parse(e.target.result); rawData = d.rawData; tables = d.tables; deptAliases = d.deptAliases; renderCanvas(); }; reader.readAsText(input.files[0]); }
         function exportImage() { html2canvas(document.getElementById('capture-area'), { scale: 2 }).then(canvas => { const a = document.createElement('a'); a.download = `尾牙桌圖.png`; a.href = canvas.toDataURL(); a.click(); }); }
         function assignToTable(t) {
             const isVeg = (t.assigned||[]).some(a=>a.type==='素'), isMeat = (t.assigned||[]).some(a=>a.type==='葷');
-            if((assignType==='素'&&isMeat) || (assignType==='葷'&&isVeg)) return alert("素食與葷食不可併桌！");
+            if((assignType==='素'&&isMeat) || (assignType==='葷'&&isVeg)) return alert("葷素不可併桌");
             const rem = getRemain(selectedDept, assignType);
             const count = parseInt(prompt(`分配 ${selectedDept} 到第 ${t.displayId} 桌`, rem));
             if(count > 0) {
@@ -258,14 +274,20 @@
                 selectedDept = null; renderCanvas();
             }
         }
-        function openDataModal(){ document.getElementById('data-modal').classList.remove('hidden'); renderDataTable(); }
-        function closeDataModal(){ document.getElementById('data-modal').classList.add('hidden'); renderCanvas(); }
-        function renderDataTable() {
-            const tbody = document.getElementById('data-table-body'); tbody.innerHTML = '';
-            rawData.forEach((item, index) => {
-                tbody.innerHTML += `<tr><td class="p-2">${item.dept}</td><td class="p-2">${item.id}</td><td class="p-2">${item.name}</td><td class="p-2">${item.diet}</td><td class="p-2"><button onclick="rawData.splice(${index},1);renderDataTable()" class="text-red-400">✕</button></td></tr>`;
-            });
-        }
+
+        // Excel 匯入
+        document.getElementById('excel-upload').onchange = (e) => {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const rows = XLSX.utils.sheet_to_json(XLSX.read(new Uint8Array(ev.target.result), {type:'array'}).Sheets[XLSX.read(new Uint8Array(ev.target.result), {type:'array'}).SheetNames[0]], {header:1});
+                for(let i=1; i<rows.length; i++){
+                    const r = rows[i]; if(!r || r.length<3) continue;
+                    rawData.push({ dept: String(r[0]||'未分類'), id: String(r[1]||''), name: String(r[2]||''), diet: String(r[3]||'葷') });
+                }
+                renderDataTable();
+            };
+            reader.readAsArrayBuffer(e.target.files[0]);
+        };
 
         init();
     </script>
