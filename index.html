@@ -115,6 +115,7 @@
     <script>
         const ROWS = 12, COLS = 19, WALKWAY_COL = 10;
         let rawData = [], tables = [], deptAliases = {}, deptColors = {};
+        let deptOrder = []; // 用來存部門的自訂順序
         let tempRawData = []; 
         let backupTables = []; // 新增這行，用來存放打開視窗前的桌位狀態
         let currentTableMode = 'normal', assignType = '葷', selectedDept = null, draggedTable = null;
@@ -125,10 +126,8 @@
     const saved = localStorage.getItem('tailor_v13_data');
     if(saved) {
         const d = JSON.parse(saved);
-        rawData = d.rawData || []; 
-        tables = d.tables || []; 
-        deptAliases = d.deptAliases || {};
-        deptColors = d.deptColors || {}; // <--- 確保有這一行！
+        // ... 原有的讀取程式碼 ...
+        deptOrder = d.deptOrder || []; // 加上這行
     }
     renderCanvas();
 }
@@ -309,50 +308,83 @@ function clearAllData() {
             renderCanvas();
         }
 
-        function renderSidebar() {
-            const list = document.getElementById('dept-list'), s = getStats();
-            list.innerHTML = '';
-           const sortedDepts = Object.keys(s); 
-sortedDepts.forEach(d => {
-                const rem = getRemain(d, assignType);
-                const isSel = selectedDept===d;
-                const div = document.createElement('div');
-                const bgStyle = rem > 0 ? 'bg-white shadow-md border-slate-200' : 'bg-slate-50 opacity-30 border-transparent text-slate-400';
-                div.className = `p-4 rounded-2xl border-2 cursor-pointer transition-all border-l-[12px] flex items-center justify-between font-black relative ${isSel?'ring-4 ring-indigo-500 ':''} ${bgStyle}`;
-                div.style.borderLeftColor = deptColors[d]; 
-    // 在下方加入這段：讓點擊左側顏色條可以換色
-const colorStrip = document.createElement('div');
-colorStrip.className = "absolute left-0 top-0 bottom-0 w-3 cursor-pointer hover:w-6 transition-all";
-colorStrip.style.backgroundColor = deptColors[d];
-colorStrip.title = "點擊更換顏色";
-colorStrip.onclick = (e) => {
-    e.stopPropagation(); // 防止觸發選取部門
-    const newColor = prompt(`輸入新的顏色代碼 (例如 #FF0000 或 blue)`, deptColors[d]);
-    if (newColor) {
-        deptColors[d] = newColor;
-        renderSidebar(); // 刷新側邊欄顏色
-        renderCanvas();  // 同步刷新桌圖顏色
-        save();          // 儲存顏色設定
+function renderSidebar() {
+    const list = document.getElementById('dept-list'), s = getStats();
+    list.innerHTML = '';
+    
+    // 取得當前所有部門
+    let depts = Object.keys(s);
+    
+    // 處理排序邏輯：如果沒存過順序，就用目前的部門列表初始化
+    if (deptOrder.length === 0 || deptOrder.length !== depts.length) {
+        deptOrder = depts; 
+    } else {
+        // 確保 deptOrder 裡的部門跟現在名單上的部門一致（防止刪除部門後出錯）
+        depts.sort((a, b) => deptOrder.indexOf(a) - deptOrder.indexOf(b));
     }
-};
-div.appendChild(colorStrip);
-                div.innerHTML = `<span>${d}</span><span class="bg-slate-100 px-3 py-1 rounded-lg text-indigo-600">${rem} 人</span>`;
-                div.onclick=()=>{ if(rem>0) {selectedDept=(selectedDept===d?null:d); renderSidebar();}};
-                list.appendChild(div);
-                // 在 renderSidebar() 內找到 div.onclick 附近加入：
-div.oncontextmenu = (e) => {
-    e.preventDefault(); // 阻止瀏覽器預設選單
-    const newAlias = prompt(`設定「${d}」在桌圖上的簡稱 (目前: ${deptAliases[d] || d.substring(0, 2)})`, deptAliases[d] || "");
-    if (newAlias !== null) {
-        deptAliases[d] = newAlias;
-        renderCanvas(); // 重新渲染桌圖以更新簡稱文字
-        save();         // 儲存變更
-    }
-};
-            });
-            let totalRem = 0; Object.keys(s).forEach(d => totalRem += getRemain(d, assignType));
-            document.getElementById('global-stats').innerText = `${assignType}食待排：${totalRem} 人`;
-        }
+
+    depts.forEach((d, index) => {
+        const rem = getRemain(d, assignType);
+        const isSel = selectedDept === d;
+        const div = document.createElement('div');
+        
+        // --- 拖拽功能實作 ---
+        div.draggable = true; 
+        div.ondragstart = (e) => {
+            e.dataTransfer.setData('text/plain', index);
+            div.style.opacity = "0.4";
+        };
+        div.ondragover = (e) => e.preventDefault();
+        div.ondrop = (e) => {
+            e.preventDefault();
+            const fromIdx = e.dataTransfer.getData('text/plain');
+            const toIdx = index;
+            const movedItem = deptOrder.splice(fromIdx, 1)[0];
+            deptOrder.splice(toIdx, 0, movedItem);
+            save(); // 搬完立刻存檔
+            renderSidebar();
+        };
+        div.ondragend = () => div.style.opacity = "1";
+
+        const bgStyle = rem > 0 ? 'bg-white shadow-md border-slate-200' : 'bg-slate-50 opacity-30 border-transparent text-slate-400';
+        
+        // 注意：這裡一定要有 relative，否則顏色條會亂跑
+        div.className = `p-4 rounded-2xl border-2 cursor-pointer transition-all border-l-[12px] flex items-center justify-between font-black relative ${isSel?'ring-4 ring-indigo-500 ':''} ${bgStyle}`;
+        div.style.borderLeftColor = deptColors[d]; 
+
+        // 顏色條 (點擊換色)
+        const colorStrip = document.createElement('div');
+        colorStrip.className = "absolute left-0 top-0 bottom-0 w-3 cursor-pointer hover:w-6 transition-all z-10";
+        colorStrip.style.backgroundColor = deptColors[d];
+        colorStrip.onclick = (e) => {
+            e.stopPropagation();
+            const newColor = prompt(`輸入新的顏色 (如 #FF0000)`, deptColors[d]);
+            if (newColor) {
+                deptColors[d] = newColor;
+                renderSidebar(); renderCanvas(); save();
+            }
+        };
+        div.appendChild(colorStrip);
+
+        // 文字內容
+        div.innerHTML += `<span>${d}</span><span class="bg-slate-100 px-3 py-1 rounded-lg text-indigo-600">${rem} 人</span>`;
+        
+        // 左鍵選取
+        div.onclick = () => { if(rem > 0) { selectedDept = (selectedDept === d ? null : d); renderSidebar(); } };
+        
+        // 右鍵簡稱
+        div.oncontextmenu = (e) => {
+            e.preventDefault();
+            const newAlias = prompt(`設定「${d}」簡稱`, deptAliases[d] || d.substring(0, 2));
+            if (newAlias !== null) { deptAliases[d] = newAlias; renderCanvas(); save(); }
+        };
+        
+        list.appendChild(div);
+    });
+
+    let totalRem = 0; Object.keys(s).forEach(d => totalRem += getRemain(d, assignType));
+    document.getElementById('global-stats').innerText = `${assignType}食待排：${totalRem} 人`;
+}
 
         function openManageModal(t) {
             document.getElementById('modal-title').innerText = `管理 ${t.displayId} 號桌`;
@@ -391,12 +423,13 @@ div.oncontextmenu = (e) => {
             save();
         }
 
-        function save(){ 
+function save(){ 
     localStorage.setItem('tailor_v13_data', JSON.stringify({
         rawData, 
         tables, 
         deptAliases,
-        deptColors // 加上這行，系統才會記住你改過的顏色
+        deptColors,
+        deptOrder // 關鍵：存入自訂順序
     })); 
 }
         function exportProject() { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({rawData, tables, deptAliases})], {type: 'application/json'})); a.download = `尾牙專案.json`; a.click(); }
