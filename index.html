@@ -245,7 +245,7 @@
     .filter(a => a.count > 0) // 關鍵：只留下人數大於 0 的資料
     .slice(0, 2)              // 維持原本只顯示前兩筆的限制，避免文字溢出
     .forEach(a => {
-        tableEl.innerHTML += `<div class="text-[12px] font-black leading-tight drop-shadow-md">${deptAliases[a.dept] || a.dept.substring(0, 2)}:${a.count}</div>`;
+        tableEl.innerHTML += `<div class="text-[15px] font-black leading-tight drop-shadow-md">${deptAliases[a.dept] || a.dept.substring(0, 2)}:${a.count}</div>`;
     });
                         if(isVeg) tableEl.innerHTML += `<div class="veg-marker">素</div>`;
                         tableEl.onclick=()=>{ if(selectedDept) assignToTable(table); else openManageModal(table); };
