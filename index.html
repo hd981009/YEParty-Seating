@@ -267,7 +267,7 @@ function getRemain(dName, type) {
                         tableEl.draggable = true;
                         
                         // 基礎樣式與紅框 (status-over) 判斷
-                        tableEl.className = `w-[75px] h-[75px] rounded-full shadow-lg flex flex-col items-center justify-center text-white cursor-move relative border-2 border-white transition-all ${isVeg ? 'veg-table-style' : ''} ${isOver ? 'status-over' : ''}`;
+                        tableEl.className = `w-[75px] h-[75px] rounded-full shadow-lg flex flex-col items-center justify-center text-white cursor-move relative border-2 border-white transition-all overflow-visible ${isVeg ? 'veg-table-style' : ''} ${isOver ? 'status-over' : ''}`;
                         
                         // 顏色邏輯修正：主桌固定為橘黃色，一般桌空桌為灰色
                         if(!isVeg) {
