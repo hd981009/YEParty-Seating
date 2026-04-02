@@ -122,13 +122,16 @@
         const PALETTE = ["#4f46e5", "#e11d48", "#8b5cf6", "#0ea5e9", "#f43f5e", "#d946ef", "#f59e0b", "#10b981", "#06b6d4", "#f97316", "#6366f1", "#ec4899", "#14b8a6", "#ef4444", "#a855f7", "#3b82f6", "#22c55e", "#eab308", "#64748b", "#475569"];
 
         function init() {
-            const saved = localStorage.getItem('tailor_v13_data');
-            if(saved) {
-                const d = JSON.parse(saved);
-                rawData = d.rawData || []; tables = d.tables || []; deptAliases = d.deptAliases || {};
-            }
-            renderCanvas();
-        }
+    const saved = localStorage.getItem('tailor_v13_data');
+    if(saved) {
+        const d = JSON.parse(saved);
+        rawData = d.rawData || []; 
+        tables = d.tables || []; 
+        deptAliases = d.deptAliases || {};
+        deptColors = d.deptColors || {}; // <--- 確保有這一行！
+    }
+    renderCanvas();
+}
 
         function getStats() {
             let s = {};
@@ -315,6 +318,22 @@ sortedDepts.forEach(d => {
                 const bgStyle = rem > 0 ? 'bg-white shadow-md border-slate-200' : 'bg-slate-50 opacity-30 border-transparent text-slate-400';
                 div.className = `p-4 rounded-2xl border-2 cursor-pointer transition-all border-l-[12px] flex items-center justify-between font-black ${isSel?'ring-4 ring-indigo-500 ':''} ${bgStyle}`;
                 div.style.borderLeftColor = deptColors[d]; 
+    // 在下方加入這段：讓點擊左側顏色條可以換色
+const colorStrip = document.createElement('div');
+colorStrip.className = "absolute left-0 top-0 bottom-0 w-3 cursor-pointer hover:w-6 transition-all";
+colorStrip.style.backgroundColor = deptColors[d];
+colorStrip.title = "點擊更換顏色";
+colorStrip.onclick = (e) => {
+    e.stopPropagation(); // 防止觸發選取部門
+    const newColor = prompt(`輸入新的顏色代碼 (例如 #FF0000 或 blue)`, deptColors[d]);
+    if (newColor) {
+        deptColors[d] = newColor;
+        renderSidebar(); // 刷新側邊欄顏色
+        renderCanvas();  // 同步刷新桌圖顏色
+        save();          // 儲存顏色設定
+    }
+};
+div.appendChild(colorStrip);
                 div.innerHTML = `<span>${d}</span><span class="bg-slate-100 px-3 py-1 rounded-lg text-indigo-600">${rem} 人</span>`;
                 div.onclick=()=>{ if(rem>0) {selectedDept=(selectedDept===d?null:d); renderSidebar();}};
                 list.appendChild(div);
@@ -374,7 +393,8 @@ div.oncontextmenu = (e) => {
     localStorage.setItem('tailor_v13_data', JSON.stringify({
         rawData, 
         tables, 
-        deptAliases // 確保這一行有包含進去
+        deptAliases,
+        deptColors // 加上這行，系統才會記住你改過的顏色
     })); 
 }
         function exportProject() { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({rawData, tables, deptAliases})], {type: 'application/json'})); a.download = `尾牙專案.json`; a.click(); }
