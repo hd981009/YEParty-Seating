@@ -139,8 +139,10 @@
                 if(!d.dept) return;
                 if(!s[d.dept]) {
                     s[d.dept] = { meat: 0, veg: 0 };
-                    if(!deptColors[d.dept]) deptColors[d.dept] = PALETTE[Object.keys(deptColors).length % PALETTE.length];
-                }
+                    if(!deptColors[d.dept]) {
+    const colorIndex = Object.keys(s).length % PALETTE.length;
+    deptColors[d.dept] = PALETTE[colorIndex];
+}
                 if(String(d.diet).includes('素')) s[d.dept].veg++; else s[d.dept].meat++;
             });
             return s;
@@ -316,7 +318,7 @@ sortedDepts.forEach(d => {
                 const isSel = selectedDept===d;
                 const div = document.createElement('div');
                 const bgStyle = rem > 0 ? 'bg-white shadow-md border-slate-200' : 'bg-slate-50 opacity-30 border-transparent text-slate-400';
-                div.className = `p-4 rounded-2xl border-2 cursor-pointer transition-all border-l-[12px] flex items-center justify-between font-black ${isSel?'ring-4 ring-indigo-500 ':''} ${bgStyle}`;
+                div.className = `p-4 rounded-2xl border-2 cursor-pointer transition-all border-l-[12px] flex items-center justify-between font-black relative ${isSel?'ring-4 ring-indigo-500 ':''} ${bgStyle}`;
                 div.style.borderLeftColor = deptColors[d]; 
     // 在下方加入這段：讓點擊左側顏色條可以換色
 const colorStrip = document.createElement('div');
