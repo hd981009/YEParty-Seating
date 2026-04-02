@@ -240,7 +240,12 @@
                         else { const mainDept = table.assigned.length > 0 ? table.assigned[0].dept : null; tableEl.style.backgroundColor = mainDept ? deptColors[mainDept] : "#94a3b8"; }
                         if(total > table.capacity) tableEl.className += " status-over";
                         tableEl.innerHTML = `<div class="table-id-tag">${table.displayId}</div>`;
-                        (table.assigned||[]).slice(0,2).forEach(a=>{ tableEl.innerHTML += `<div class="text-[12px] font-black leading-tight drop-shadow-md">${deptAliases[a.dept]||a.dept.substring(0,2)}:${a.count}</div>`; });
+                        (table.assigned || [])
+    .filter(a => a.count > 0) // 關鍵：只留下人數大於 0 的資料
+    .slice(0, 2)              // 維持原本只顯示前兩筆的限制，避免文字溢出
+    .forEach(a => {
+        tableEl.innerHTML += `<div class="text-[12px] font-black leading-tight drop-shadow-md">${deptAliases[a.dept] || a.dept.substring(0, 2)}:${a.count}</div>`;
+    });
                         if(isVeg) tableEl.innerHTML += `<div class="veg-marker">素</div>`;
                         tableEl.onclick=()=>{ if(selectedDept) assignToTable(table); else openManageModal(table); };
                         tableEl.oncontextmenu=(e)=>{ e.preventDefault(); if(confirm('刪除？')) tables = tables.filter(t=>t!==table); renderCanvas(); };
