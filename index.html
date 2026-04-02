@@ -304,6 +304,16 @@
                 div.innerHTML = `<span>${d}</span><span class="bg-slate-100 px-3 py-1 rounded-lg text-indigo-600">${rem} 人</span>`;
                 div.onclick=()=>{ if(rem>0) {selectedDept=(selectedDept===d?null:d); renderSidebar();}};
                 list.appendChild(div);
+                // 在 renderSidebar() 內找到 div.onclick 附近加入：
+div.oncontextmenu = (e) => {
+    e.preventDefault(); // 阻止瀏覽器預設選單
+    const newAlias = prompt(`設定「${d}」在桌圖上的簡稱 (目前: ${deptAliases[d] || d.substring(0, 2)})`, deptAliases[d] || "");
+    if (newAlias !== null) {
+        deptAliases[d] = newAlias;
+        renderCanvas(); // 重新渲染桌圖以更新簡稱文字
+        save();         // 儲存變更
+    }
+};
             });
             let totalRem = 0; Object.keys(s).forEach(d => totalRem += getRemain(d, assignType));
             document.getElementById('global-stats').innerText = `${assignType}食待排：${totalRem} 人`;
@@ -346,7 +356,13 @@
             save();
         }
 
-        function save(){ localStorage.setItem('tailor_v13_data', JSON.stringify({rawData, tables, deptAliases})); }
+        function save(){ 
+    localStorage.setItem('tailor_v13_data', JSON.stringify({
+        rawData, 
+        tables, 
+        deptAliases // 確保這一行有包含進去
+    })); 
+}
         function exportProject() { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({rawData, tables, deptAliases})], {type: 'application/json'})); a.download = `尾牙專案.json`; a.click(); }
         function importProject(input) { const reader = new FileReader(); reader.onload = (e) => { const d = JSON.parse(e.target.result); rawData = d.rawData; tables = d.tables; deptAliases = d.deptAliases; renderCanvas(); }; reader.readAsText(input.files[0]); }
         function exportImage() { html2canvas(document.getElementById('capture-area'), { scale: 2 }).then(canvas => { const a = document.createElement('a'); a.download = `尾牙桌圖.png`; a.href = canvas.toDataURL(); a.click(); }); }
