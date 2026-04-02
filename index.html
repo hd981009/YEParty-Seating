@@ -166,10 +166,9 @@
         }
 
         function cancelDataChanges() {
-            if(confirm("確定要取消剛才的所有修改嗎？(包括已匯入的 Excel 資料)")) {
-                tempRawData = [];
-                document.getElementById('data-modal').classList.add('hidden');
-            }
+    tempRawData = []; // 清空暫存
+    document.getElementById('data-modal').classList.add('hidden'); // 直接隱藏彈窗
+}
         }
         // 清除所有名單資料
 function clearAllData() {
