@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <title>尾牙排座系統 V13.7 - 穩定重構版</title>
+    <title>貿協交流餐會桌位 V13.7 </title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -20,7 +20,7 @@
         
         /* 模式按鈕啟用樣式 */
         .btn-active-indigo { background-color: #4f46e5 !important; color: white !important; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4); }
-        .btn-active-orange { background-color: #f97316 !important; color: white !important; box-shadow: 0 4px 12px rgba(249, 115, 22, 0.4); }
+        .btn-active-orange { background-color: #fed33c !important; color: white !important; box-shadow: 0 4px 12px rgba(249, 115, 22, 0.4); }
         .btn-active-green { background-color: #16a34a !important; color: white !important; box-shadow: 0 4px 12px rgba(22, 163, 74, 0.4); }
     </style>
 </head>
@@ -236,7 +236,7 @@
                         tableEl.draggable = true;
                         tableEl.className = `w-[75px] h-[75px] rounded-full shadow-lg flex flex-col items-center justify-center text-white cursor-move relative border-2 border-white transition-all`;
                         if(isVeg) tableEl.className += " veg-table-style";
-                        else if(table.type === 'main') tableEl.style.backgroundColor = "#f97316"; 
+                        else if(table.type === 'main') tableEl.style.backgroundColor = "#fed33c"; 
                         else { const mainDept = table.assigned.length > 0 ? table.assigned[0].dept : null; tableEl.style.backgroundColor = mainDept ? deptColors[mainDept] : "#94a3b8"; }
                         if(total > table.capacity) tableEl.className += " status-over";
                         tableEl.innerHTML = `<div class="table-id-tag">${table.displayId}</div>`;
@@ -284,15 +284,37 @@
             document.getElementById('global-stats').innerText = `${assignType}食待排：${totalRem} 人`;
         }
 
-        function openManageModal(t){
-            document.getElementById('modal-title').innerText = `管理 ${t.displayId}`;
-            const c = document.getElementById('modal-content'); c.innerHTML = '';
-            t.assigned.forEach((a,i)=>{
-                c.innerHTML += `<div class="p-3 bg-slate-100 rounded-xl flex justify-between items-center mb-2 font-bold"><span class="text-xs">${a.dept} (${a.type})</span><input type="number" value="${a.count}" class="w-16 border rounded text-center" onchange="t.assigned[${i}].count=parseInt(this.value)"></div>`;
-            });
-            document.getElementById('manage-modal').classList.remove('hidden');
-        }
-        function saveAndCloseManage(){ document.getElementById('manage-modal').classList.add('hidden'); renderCanvas(); }
+        function openManageModal(t) {
+    document.getElementById('modal-title').innerText = `管理 ${t.displayId} 號桌`;
+    const c = document.getElementById('modal-content');
+    c.innerHTML = '';
+
+    t.assigned.forEach((a, i) => {
+        const itemDiv = document.createElement('div');
+        itemDiv.className = "p-3 bg-slate-100 rounded-xl flex justify-between items-center mb-2 font-bold";
+        itemDiv.innerHTML = `<span class="text-xs">${a.dept} (${a.type})</span>`;
+
+        const input = document.createElement('input');
+        input.type = "number";
+        input.value = a.count;
+        input.className = "w-16 border rounded text-center";
+        
+        // 關鍵：使用監聽器直接改寫原始物件 t
+        input.onchange = () => {
+            t.assigned[i].count = parseInt(input.value) || 0;
+        };
+
+        itemDiv.appendChild(input);
+        c.appendChild(itemDiv);
+    });
+    document.getElementById('manage-modal').classList.remove('hidden');
+}
+        function saveAndCloseManage() {
+    document.getElementById('manage-modal').classList.add('hidden');
+    renderCanvas();
+    renderSidebar();
+    save();
+}
         function save(){ localStorage.setItem('tailor_v13_data', JSON.stringify({rawData, tables, deptAliases})); }
         function exportProject() { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({rawData, tables, deptAliases})], {type: 'application/json'})); a.download = `尾牙專案.json`; a.click(); }
         function importProject(input) { const reader = new FileReader(); reader.onload = (e) => { const d = JSON.parse(e.target.result); rawData = d.rawData; tables = d.tables; deptAliases = d.deptAliases; renderCanvas(); }; reader.readAsText(input.files[0]); }
