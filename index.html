@@ -391,33 +391,68 @@ tableEl.appendChild(contentWrapper);
         
         div.onclick = () => { if(rem > 0) { selectedDept = (selectedDept === d ? null : d); renderSidebar(); } };
         
-       // --- 右鍵修改簡稱與顏色 (V13.8 串聯優化版) ---
+       // --- 右鍵修改簡稱與顏色 (V13.8 一體化版本) ---
         div.oncontextmenu = (e) => {
             e.preventDefault();
             
-            // 1. 修改簡稱
-            const newAlias = prompt(`設定「${d}」簡稱`, deptAliases[d] || d.substring(0, 2));
-            if (newAlias !== null) {
-                deptAliases[d] = newAlias;
-                save();
-                renderCanvas(); // <--- 關鍵：改完簡稱立即重新繪製桌圖
-            }
+            // 移除可能已經存在的舊視窗
+            const oldMenu = document.getElementById('temp-context-menu');
+            if (oldMenu) oldMenu.remove();
 
-            // 2. 修改顏色 (加上延遲確保在 Prompt 之後順暢觸發)
-            setTimeout(() => {
-                const colorPicker = document.createElement('input');
-                colorPicker.type = 'color';
-                colorPicker.value = window.customDeptColors && window.customDeptColors[d] ? window.customDeptColors[d] : getDeptColor(d);
+            // 建立一個浮動小視窗
+            const menu = document.createElement('div');
+            menu.id = 'temp-context-menu';
+            menu.className = "fixed bg-white shadow-2xl rounded-2xl p-4 z-[200] border border-slate-200 flex flex-col gap-3 min-w-[200px]";
+            menu.style.left = `${e.clientX}px`;
+            menu.style.top = `${e.clientY}px`;
+
+            const currentColor = window.customDeptColors && window.customDeptColors[d] ? window.customDeptColors[d] : getDeptColor(d);
+            const currentAlias = deptAliases[d] || d.substring(0, 2);
+
+            menu.innerHTML = `
+                <div class="text-sm font-black text-slate-500 mb-1">${d} 設定</div>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">部門簡稱 (2-3字)</label>
+                    <input id="edit-alias" type="text" class="w-full border rounded-lg px-2 py-1 font-bold" value="${currentAlias}">
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">部門代表色</label>
+                    <input id="edit-color" type="color" class="w-full h-10 border rounded-lg cursor-pointer" value="${currentColor}">
+                </div>
+                <div class="flex gap-2 mt-2">
+                    <button id="btn-save-edit" class="flex-1 bg-indigo-600 text-white py-2 rounded-lg text-sm font-bold">儲存</button>
+                    <button id="btn-cancel-edit" class="flex-1 bg-slate-100 text-slate-600 py-2 rounded-lg text-sm font-bold">取消</button>
+                </div>
+            `;
+
+            document.body.appendChild(menu);
+
+            // 儲存按鈕邏輯
+            document.getElementById('btn-save-edit').onclick = () => {
+                const newAlias = document.getElementById('edit-alias').value;
+                const newColor = document.getElementById('edit-color').value;
                 
-                colorPicker.onchange = () => {
-                    if(!window.customDeptColors) window.customDeptColors = {};
-                    window.customDeptColors[d] = colorPicker.value;
-                    save();
-                    renderCanvas(); // <--- 關鍵：改完顏色立即重新繪製桌圖與側邊欄
-                    renderSidebar(); // 同步更新側邊欄邊框顏色
-                };
-                colorPicker.click();
-            }, 150);
+                deptAliases[d] = newAlias;
+                if(!window.customDeptColors) window.customDeptColors = {};
+                window.customDeptColors[d] = newColor;
+                
+                save();
+                renderCanvas();
+                renderSidebar();
+                menu.remove();
+            };
+
+            // 取消按鈕邏輯
+            document.getElementById('btn-cancel-edit').onclick = () => menu.remove();
+
+            // 點擊視窗外部自動關閉
+            const closeHandler = (ev) => {
+                if (!menu.contains(ev.target)) {
+                    menu.remove();
+                    document.removeEventListener('mousedown', closeHandler);
+                }
+            };
+            setTimeout(() => document.addEventListener('mousedown', closeHandler), 10);
         };
 
         list.appendChild(div); // 這行剛才可能被刪掉了
