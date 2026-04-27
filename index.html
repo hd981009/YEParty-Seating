@@ -559,17 +559,43 @@ function autoSortVegFirst() {
     a.download = `尾牙專案.json`; 
     a.click(); 
 }
-       function importProject(input) { 
+      function importProject(input) { 
+    // 防呆機制：檢查是否已有資料，並詢問使用者
+    const hasData = rawData.length > 0 || tables.length > 0;
+    if (hasData) {
+        const proceed = confirm("⚠️ 注意：匯入新專案將會「完全覆蓋」目前所有的名單與桌位圖！\n\n您確定要繼續嗎？");
+        if (!proceed) {
+            input.value = ''; // 清空 input 讓下次選同一個檔案也能觸發
+            return;
+        }
+    }
+
     const reader = new FileReader(); 
     reader.onload = (e) => { 
-        const d = JSON.parse(e.target.result); 
-        rawData = d.rawData; 
-        tables = d.tables; 
-        deptAliases = d.deptAliases || {}; 
-        deptOrder = d.deptOrder || []; 
-        renderCanvas(); 
+        try {
+            const d = JSON.parse(e.target.result); 
+            
+            // 讀取資料
+            rawData = d.rawData || []; 
+            tables = d.tables || []; 
+            deptAliases = d.deptAliases || {}; 
+            deptOrder = d.deptOrder || []; 
+            window.customDeptColors = d.customDeptColors || {}; // 同步讀取自定義顏色
+
+            // 成功匯入後立即儲存到瀏覽器並重繪
+            save();
+            renderCanvas(); 
+            alert("專案已成功匯入！");
+        } catch (err) {
+            alert("讀取失敗：檔案格式不正確。");
+            console.error(err);
+        }
+        input.value = ''; // 處理完後清空
     }; 
-    reader.readAsText(input.files[0]); 
+    
+    if (input.files[0]) {
+        reader.readAsText(input.files[0]);
+    }
 }
         function exportImage() {
     const captureArea = document.getElementById('capture-area');
