@@ -143,6 +143,10 @@ const PALETTE = [
 
 // 新增一個顏色分配函數：根據字串產生固定的顏色索引
 function getDeptColor(deptName) {
+    // 優先使用自定義顏色
+    if (window.customDeptColors && window.customDeptColors[deptName]) {
+        return window.customDeptColors[deptName];
+    }
     if (!deptName) return "#94a3b8";
     let hash = 0;
     for (let i = 0; i < deptName.length; i++) {
@@ -161,8 +165,9 @@ function init() {
         tables = d.tables || []; 
         deptAliases = d.deptAliases || {};
         deptOrder = d.deptOrder || []; 
+        window.customDeptColors = d.customDeptColors || {}; // 讀顏色
     }
-    renderCanvas(); // renderCanvas 會連帶觸發 renderSidebar
+    renderCanvas();
 }
 
 function getStats() {
@@ -364,14 +369,13 @@ tableEl.appendChild(contentWrapper);
     deptOrder.forEach((d, index) => {
         const rem = getRemain(d, assignType);
         const isSel = selectedDept === d;
-        const color = getDeptColor(d); // 直接取得固定顏色
+        const color = getDeptColor(d); 
         
         const div = document.createElement('div');
         div.draggable = true;
         div.className = `p-4 rounded-2xl border-2 cursor-pointer transition-all border-l-[12px] flex items-center justify-between font-black relative ${isSel?'ring-4 ring-indigo-500 ':''} ${rem>0?'bg-white shadow-md border-slate-200':'bg-slate-50 opacity-30 border-transparent text-slate-400'}`;
-        div.style.borderLeftColor = color; // 使用自動分配的顏色
+        div.style.borderLeftColor = color; 
         
-        // 拖拽排序
         div.ondragstart = (e) => { e.dataTransfer.setData('text/plain', index); div.style.opacity = "0.4"; };
         div.ondragover = (e) => e.preventDefault();
         div.ondrop = (e) => {
@@ -383,47 +387,46 @@ tableEl.appendChild(contentWrapper);
         };
         div.ondragend = () => div.style.opacity = "1";
 
-        // 文字內容 (移除了點擊換色的 colorStrip)
         div.innerHTML = `<span>${d}</span><span class="bg-slate-100 px-3 py-1 rounded-lg text-indigo-600">${rem} 人</span>`;
         
-        // 部門選取
         div.onclick = () => { if(rem > 0) { selectedDept = (selectedDept === d ? null : d); renderSidebar(); } };
         
         // --- 右鍵修改簡稱與顏色 ---
-div.oncontextmenu = (e) => {
-    e.preventDefault();
-    
-    // 1. 先改簡稱
-    const newAlias = prompt(`設定「${d}」簡稱`, deptAliases[d] || d.substring(0, 2));
-    if (newAlias === null) return; // 使用者按取消就停止
-    deptAliases[d] = newAlias;
+        div.oncontextmenu = (e) => {
+            e.preventDefault();
+            const newAlias = prompt(`設定「${d}」簡稱`, deptAliases[d] || d.substring(0, 2));
+            if (newAlias === null) return;
+            deptAliases[d] = newAlias;
 
-    // 2. 再改顏色：利用一個隱藏的 input color 來觸發
-    const colorPicker = document.createElement('input');
-    colorPicker.type = 'color';
-    // 預設值抓取目前的顏色
-    colorPicker.value = getDeptColor(d); 
-    
-    colorPicker.onchange = () => {
-        const newColor = colorPicker.value;
-        // 將自定義顏色存入一個新的全域變數 customDeptColors
-        if(!window.customDeptColors) window.customDeptColors = {};
-        window.customDeptColors[d] = newColor;
-        
-        save();         // 儲存設定
-        renderCanvas(); // 立即重新渲染桌圖與側邊欄
-    };
-    
-    colorPicker.click(); // 自動觸發點擊，打開系統顏色盤
-};
+            const colorPicker = document.createElement('input');
+            colorPicker.type = 'color';
+            colorPicker.value = getDeptColor(d); 
+            
+            colorPicker.onchange = () => {
+                if(!window.customDeptColors) window.customDeptColors = {};
+                window.customDeptColors[d] = colorPicker.value;
+                save(); renderCanvas();
+            };
+            colorPicker.click();
+        };
 
-    let totalRem = 0; Object.keys(s).forEach(d => totalRem += getRemain(d, assignType));
+        list.appendChild(div); // 這行剛才可能被刪掉了
+    }); // 這是 deptOrder.forEach 的結束
+
+    let totalRem = 0; 
+    Object.keys(s).forEach(d => totalRem += getRemain(d, assignType));
     document.getElementById('global-stats').innerText = `${assignType}食待排：${totalRem} 人`;
-}
+} // 這是 renderSidebar 的結束
 
-        function save(){ 
-            localStorage.setItem('tailor_v13_data', JSON.stringify({ rawData, tables, deptAliases, deptOrder })); 
-        }
+      function save(){ 
+    localStorage.setItem('tailor_v13_data', JSON.stringify({ 
+        rawData, 
+        tables, 
+        deptAliases, 
+        deptOrder,
+        customDeptColors: window.customDeptColors // 存顏色
+    })); 
+}
 
         function openManageModal(t) {
     document.getElementById('modal-title').innerText = `管理 ${t.displayId} 號桌`;
