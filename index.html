@@ -389,14 +389,33 @@ tableEl.appendChild(contentWrapper);
         // 部門選取
         div.onclick = () => { if(rem > 0) { selectedDept = (selectedDept === d ? null : d); renderSidebar(); } };
         
-        // 右鍵簡稱
-        div.oncontextmenu = (e) => {
-            e.preventDefault();
-            const na = prompt(`設定「${d}」簡稱`, deptAliases[d] || d.substring(0, 2));
-            if(na !== null) { deptAliases[d] = na; save(); renderCanvas(); }
-        };
-        list.appendChild(div);
-    });
+        // --- 右鍵修改簡稱與顏色 ---
+div.oncontextmenu = (e) => {
+    e.preventDefault();
+    
+    // 1. 先改簡稱
+    const newAlias = prompt(`設定「${d}」簡稱`, deptAliases[d] || d.substring(0, 2));
+    if (newAlias === null) return; // 使用者按取消就停止
+    deptAliases[d] = newAlias;
+
+    // 2. 再改顏色：利用一個隱藏的 input color 來觸發
+    const colorPicker = document.createElement('input');
+    colorPicker.type = 'color';
+    // 預設值抓取目前的顏色
+    colorPicker.value = getDeptColor(d); 
+    
+    colorPicker.onchange = () => {
+        const newColor = colorPicker.value;
+        // 將自定義顏色存入一個新的全域變數 customDeptColors
+        if(!window.customDeptColors) window.customDeptColors = {};
+        window.customDeptColors[d] = newColor;
+        
+        save();         // 儲存設定
+        renderCanvas(); // 立即重新渲染桌圖與側邊欄
+    };
+    
+    colorPicker.click(); // 自動觸發點擊，打開系統顏色盤
+};
 
     let totalRem = 0; Object.keys(s).forEach(d => totalRem += getRemain(d, assignType));
     document.getElementById('global-stats').innerText = `${assignType}食待排：${totalRem} 人`;
