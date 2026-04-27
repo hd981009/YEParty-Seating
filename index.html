@@ -290,26 +290,39 @@ function getRemain(dName, type) {
                         // 顯示桌號標籤
                         tableEl.innerHTML = `<div class="table-id-tag">${table.displayId}</div>`;
 
-                        // --- 顯示分配內容（僅修改此段，其餘保留） ---
+                        // --- 顯示分配內容（V13.8 強化垂直置中版） ---
 const assignedList = (table.assigned || []).filter(a => a.count > 0);
 const deptCount = assignedList.length;
 
-// 自動判定字體大小：1-2個部門維持原狀，3個以上開始縮小
+// 1. 動態字體與行高設定
 let fontSize = "13px";
+let lineHeight = "1.2";
+let marginTop = "0px"; // 預設不偏移
+
 if (deptCount === 3) {
     fontSize = "11px";
+    lineHeight = "1.1";
+    marginTop = "2px";  // 3行時稍微下壓，避免撞到黑色標籤
 } else if (deptCount >= 4) {
     fontSize = "9px";
+    lineHeight = "1.0";
+    marginTop = "5px";  // 4行時內容較多，強制下壓 5px 確保視覺置中
 }
 
-// 移除原有的 .slice(0, 2)，改為全部跑完
+// 2. 建立一個包裹容器來統一控制垂直位置
+const contentWrapper = document.createElement('div');
+contentWrapper.style.marginTop = marginTop;
+contentWrapper.className = "flex flex-col items-center justify-center w-full";
+
 assignedList.forEach(a => {
-    tableEl.innerHTML += `
-        <div style="font-size: ${fontSize};" 
-             class="font-black leading-tight drop-shadow-md whitespace-nowrap">
+    contentWrapper.innerHTML += `
+        <div style="font-size: ${fontSize}; line-height: ${lineHeight};" 
+             class="font-black drop-shadow-md whitespace-nowrap">
             ${deptAliases[a.dept] || a.dept.substring(0, 2)}:${a.count}
         </div>`;
 });
+
+tableEl.appendChild(contentWrapper);
 
                         if(isVeg) tableEl.innerHTML += `<div class="veg-marker">素</div>`;
                         
