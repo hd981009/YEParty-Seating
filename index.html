@@ -391,33 +391,34 @@ tableEl.appendChild(contentWrapper);
         
         div.onclick = () => { if(rem > 0) { selectedDept = (selectedDept === d ? null : d); renderSidebar(); } };
         
-       // --- 右鍵修改簡稱與顏色 ---
+       // --- 右鍵修改簡稱與顏色 (V13.8 串聯優化版) ---
         div.oncontextmenu = (e) => {
             e.preventDefault();
             
-            // 1. 先問簡稱
+            // 1. 修改簡稱
             const newAlias = prompt(`設定「${d}」簡稱`, deptAliases[d] || d.substring(0, 2));
             if (newAlias !== null) {
                 deptAliases[d] = newAlias;
                 save();
+                renderCanvas(); // <--- 關鍵：改完簡稱立即重新繪製桌圖
             }
 
-            // 2. 隨後立刻觸發顏色選擇 (延遲 100ms 確保 prompt 視窗已完全關閉)
+            // 2. 修改顏色 (加上延遲確保在 Prompt 之後順暢觸發)
             setTimeout(() => {
                 const colorPicker = document.createElement('input');
                 colorPicker.type = 'color';
-                // 讀取目前的顏色作為預設值
                 colorPicker.value = window.customDeptColors && window.customDeptColors[d] ? window.customDeptColors[d] : getDeptColor(d);
                 
                 colorPicker.onchange = () => {
                     if(!window.customDeptColors) window.customDeptColors = {};
                     window.customDeptColors[d] = colorPicker.value;
                     save();
-                    renderCanvas(); // 重新渲染畫布套用新顏色
+                    renderCanvas(); // <--- 關鍵：改完顏色立即重新繪製桌圖與側邊欄
+                    renderSidebar(); // 同步更新側邊欄邊框顏色
                 };
                 colorPicker.click();
-            }, 100);
-        }
+            }, 150);
+        };
 
         list.appendChild(div); // 這行剛才可能被刪掉了
     }); // 這是 deptOrder.forEach 的結束
