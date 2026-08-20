@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <title>貿協交流餐會桌位 V13.7</title>
+    <title>貿協交流餐會桌位 V13.9</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -14,20 +14,20 @@
         .veg-table-style { background-color: #16a34a !important; border: 2px solid white !important; }
         .veg-marker { position: absolute; bottom: -4px; right: -4px; background: #22c55e; color: white; border-radius: 50%; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; font-size: 14px; border: 2px solid white; font-weight: bold; z-index: 20; }
         .table-id-tag { 
-    position: absolute; 
-    top: -12px; 
-    left: 50%; /* 新增：鎖定水平中心 */
-    transform: translateX(-50%); /* 新增：精準置中 */
-    background: #1e293b; 
-    padding: 2px 10px; 
-    border-radius: 14px; 
-    font-size: 13px; 
-    color: white; 
-    z-index: 10; 
-    font-weight: bold; 
-    border: 2px solid white; 
-    white-space: nowrap; /* 新增：防止文字換行造成偏移 */
-}
+            position: absolute; 
+            top: -12px; 
+            left: 50%; 
+            transform: translateX(-50%); 
+            background: #1e293b; 
+            padding: 2px 10px; 
+            border-radius: 14px; 
+            font-size: 13px; 
+            color: white; 
+            z-index: 10; 
+            font-weight: bold; 
+            border: 2px solid white; 
+            white-space: nowrap; 
+        }
         .modal-bg { background-color: rgba(0,0,0,0.7); backdrop-filter: blur(5px); }
         #scroll-wrapper { overflow: auto !important; height: 100vh; flex-grow: 1; }
         .stage-container { width: 100%; display: flex; justify-content: center; margin-bottom: 2rem; }
@@ -39,7 +39,7 @@
 <body class="bg-slate-100 font-sans min-h-screen flex text-slate-800 overflow-hidden" oncontextmenu="return false;">
 
     <div class="w-96 bg-white shadow-2xl h-screen flex flex-col border-r z-50 p-5 flex-shrink-0">
-        <h1 class="text-2xl font-black text-indigo-600 mb-4 tracking-tighter">尾牙排座系統 V13.7</h1>
+        <h1 class="text-2xl font-black text-indigo-600 mb-4 tracking-tighter">尾牙排座系統 V13.9</h1>
 
         <div class="grid grid-cols-2 gap-2 mb-4">
             <button onclick="setMode('normal')" id="mode-normal" class="py-3 rounded-xl border-2 border-slate-100 text-slate-400 font-bold text-base transition-all btn-active-indigo">一般桌 (10人)</button>
@@ -65,6 +65,7 @@
             <button onclick="exportProject()" class="py-2 border border-slate-200 rounded text-xs text-slate-400">儲存專案</button>
             <button onclick="document.getElementById('import-project').click()" class="py-2 border border-slate-200 rounded text-xs text-slate-400">讀取專案</button>
             <input type="file" id="import-project" class="hidden" onchange="importProject(this)">
+            <button onclick="resetSystem()" class="col-span-2 py-2.5 bg-red-100 hover:bg-red-600 hover:text-white text-red-600 rounded-xl font-bold text-xs transition-all shadow-sm">⚠️ RESET 全系統重置</button>
         </div> 
     </div>
 
@@ -132,64 +133,59 @@
         let tempRawData = [], backupTables = []; 
         let currentTableMode = 'normal', assignType = '葷', selectedDept = null, draggedTable = null;
 
-// 擴充至 25 種精選顏色 (包含深淺層次，確保視覺辨識度)
-const PALETTE = [
-    "#86AFE6", "#7AABCC", "#FE6F61", "#BE64CA", "#949597", 
-    "#F4C220", "#45B5A9", "#8B8CBF", "#AD5D98", "#F7C9C9", 
-    "#DECCBE", "#94D0CF", "#008AF2", "#BC2649", "#9ABE66", 
-    "#B48A5C", "#4C2A6E", "#1568B3", "#E0728C", "#06AA41", 
-    "#156082", "#3D4C5B", "#4F6A2E", "#666432", "#9A0000"
-];
+        const PALETTE = [
+            "#86AFE6", "#7AABCC", "#FE6F61", "#BE64CA", "#949597", 
+            "#F4C220", "#45B5A9", "#8B8CBF", "#AD5D98", "#F7C9C9", 
+            "#DECCBE", "#94D0CF", "#008AF2", "#BC2649", "#9ABE66", 
+            "#B48A5C", "#4C2A6E", "#1568B3", "#E0728C", "#06AA41", 
+            "#156082", "#3D4C5B", "#4F6A2E", "#666432", "#9A0000"
+        ];
 
-// 新增一個顏色分配函數：根據字串產生固定的顏色索引
-function getDeptColor(deptName) {
-    // 優先使用自定義顏色
-    if (window.customDeptColors && window.customDeptColors[deptName]) {
-        return window.customDeptColors[deptName];
-    }
-    if (!deptName) return "#94a3b8";
-    let hash = 0;
-    for (let i = 0; i < deptName.length; i++) {
-        hash = deptName.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const index = Math.abs(hash) % PALETTE.length;
-    return PALETTE[index];
-}
+        function getDeptColor(deptName) {
+            if (window.customDeptColors && window.customDeptColors[deptName]) {
+                return window.customDeptColors[deptName];
+            }
+            if (!deptName) return "#94a3b8";
+            let hash = 0;
+            for (let i = 0; i < deptName.length; i++) {
+                hash = deptName.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            const index = Math.abs(hash) % PALETTE.length;
+            return PALETTE[index];
+        }
 
-// 修正後的 init: 確保所有資料都能正確讀取
-function init() {
-    const saved = localStorage.getItem('tailor_v13_data');
-    if(saved) {
-        const d = JSON.parse(saved);
-        rawData = d.rawData || []; 
-        tables = d.tables || []; 
-        deptAliases = d.deptAliases || {};
-        deptOrder = d.deptOrder || []; 
-        window.customDeptColors = d.customDeptColors || {}; // 讀顏色
-    }
-    renderCanvas();
-}
+        function init() {
+            const saved = localStorage.getItem('tailor_v13_data');
+            if(saved) {
+                const d = JSON.parse(saved);
+                rawData = d.rawData || []; 
+                tables = d.tables || []; 
+                deptAliases = d.deptAliases || {};
+                deptOrder = d.deptOrder || []; 
+                window.customDeptColors = d.customDeptColors || {};
+            }
+            renderCanvas();
+        }
 
-function getStats() {
-    let s = {};
-    rawData.forEach(d => {
-        if (!d.dept) return;
-        if (!s[d.dept]) s[d.dept] = { meat: 0, veg: 0 };
-        if (String(d.diet).includes('素')) s[d.dept].veg++; 
-        else s[d.dept].meat++;
-    });
-    return s;
-}
+        function getStats() {
+            let s = {};
+            rawData.forEach(d => {
+                if (!d.dept) return;
+                if (!s[d.dept]) s[d.dept] = { meat: 0, veg: 0 };
+                if (String(d.diet).includes('素')) s[d.dept].veg++; 
+                else s[d.dept].meat++;
+            });
+            return s;
+        }
 
-// 緊接著下一段函數
-function getRemain(dName, type) {
-    const stats = getStats()[dName] || { meat: 0, veg: 0 };
-    let assigned = 0;
-    tables.forEach(t => (t.assigned || []).forEach(a => { 
-        if (a.dept === dName && a.type === type) assigned += a.count; 
-    }));
-    return (type === '葷' ? stats.meat : stats.veg) - assigned;
-}
+        function getRemain(dName, type) {
+            const stats = getStats()[dName] || { meat: 0, veg: 0 };
+            let assigned = 0;
+            tables.forEach(t => (t.assigned || []).forEach(a => { 
+                if (a.dept === dName && a.type === type) assigned += a.count; 
+            }));
+            return (type === '葷' ? stats.meat : stats.veg) - assigned;
+        }
 
         function openDataModal() {
             tempRawData = JSON.parse(JSON.stringify(rawData)); 
@@ -264,70 +260,55 @@ function getRemain(dName, type) {
                     
                     if(table){
                         const total = (table.assigned || []).reduce((s,a)=>s+a.count, 0);
-                        const isOver = total > table.capacity; // 判斷是否人數爆滿
+                        const isOver = total > table.capacity;
                         const isVeg = (table.assigned || []).some(a => a.type === '素');
                         const hasPeople = total > 0;
                         
                         const tableEl = document.createElement('div');
                         tableEl.draggable = true;
                         
-                        // 基礎樣式與紅框 (status-over) 判斷
                         tableEl.className = `w-[75px] h-[75px] rounded-full shadow-lg flex flex-col items-center justify-center text-white cursor-move relative border-2 border-white transition-all overflow-visible ${isVeg ? 'veg-table-style' : ''} ${isOver ? 'status-over' : ''}`;
                         
-                        // 顏色邏輯修正：主桌固定為橘黃色，一般桌空桌為灰色
                         if(!isVeg) {
-                         if (table.type === 'main') {
-        tableEl.style.backgroundColor = "#fbbf24"; // 主桌專用橘黃色
-    } else if (!hasPeople) {
-        tableEl.style.backgroundColor = "#cbd5e1"; // 一般空桌顯示灰色
-    } else {
-        // --- 核心修正處 ---
-        // 1. 檢查是否有手動選定的 primaryDept，且該部門是否還在這一桌的名單內
-        const primaryExists = table.assigned.some(a => a.dept === table.primaryDept && a.count > 0);
-        
-        // 2. 決定要抓哪一個單位的顏色：有手動選定就用手動的，沒有就抓第一筆
-        const targetDept = primaryExists ? table.primaryDept : table.assigned[0].dept;
-        
-        tableEl.style.backgroundColor = getDeptColor(targetDept);
-    }
+                            if (table.type === 'main') {
+                                tableEl.style.backgroundColor = "#fbbf24";
+                            } else if (!hasPeople) {
+                                tableEl.style.backgroundColor = "#cbd5e1";
+                            } else {
+                                const primaryExists = table.assigned.some(a => a.dept === table.primaryDept && a.count > 0);
+                                const targetDept = primaryExists ? table.primaryDept : table.assigned[0].dept;
+                                tableEl.style.backgroundColor = getDeptColor(targetDept);
+                            }
                         }
 
-                        // 顯示桌號標籤
                         tableEl.innerHTML = `<div class="table-id-tag">${table.displayId}</div>`;
 
-                        // --- 顯示分配內容（V13.8 強化垂直置中版） ---
-const assignedList = (table.assigned || []).filter(a => a.count > 0);
-const deptCount = assignedList.length;
+                        const assignedList = (table.assigned || []).filter(a => a.count > 0);
+                        const deptCount = assignedList.length;
 
-// 1. 動態字體與行高設定
-let fontSize = "13px";
-let lineHeight = "1.2";
-let marginTop = "0px"; // 預設不偏移
+                        let fontSize = "13px";
+                        let lineHeight = "1.2";
+                        let marginTop = "0px";
 
-if (deptCount === 3) {
-    fontSize = "11px";
-    lineHeight = "1.1";
-    marginTop = "2px";  // 3行時稍微下壓，避免撞到黑色標籤
-} else if (deptCount >= 4) {
-    fontSize = "9px";
-    lineHeight = "1.0";
-    marginTop = "5px";  // 4行時內容較多，強制下壓 5px 確保視覺置中
-}
+                        if (deptCount === 3) {
+                            fontSize = "11px"; lineHeight = "1.1"; marginTop = "2px";
+                        } else if (deptCount >= 4) {
+                            fontSize = "9px"; lineHeight = "1.0"; marginTop = "5px";
+                        }
 
-// 2. 建立一個包裹容器來統一控制垂直位置
-const contentWrapper = document.createElement('div');
-contentWrapper.style.marginTop = marginTop;
-contentWrapper.className = "flex flex-col items-center justify-center w-full";
+                        const contentWrapper = document.createElement('div');
+                        contentWrapper.style.marginTop = marginTop;
+                        contentWrapper.className = "flex flex-col items-center justify-center w-full";
 
-assignedList.forEach(a => {
-    contentWrapper.innerHTML += `
-        <div style="font-size: ${fontSize}; line-height: ${lineHeight};" 
-             class="font-black drop-shadow-md whitespace-nowrap">
-            ${deptAliases[a.dept] || a.dept.substring(0, 2)}:${a.count}
-        </div>`;
-});
+                        assignedList.forEach(a => {
+                            contentWrapper.innerHTML += `
+                                <div style="font-size: ${fontSize}; line-height: ${lineHeight};" 
+                                     class="font-black drop-shadow-md whitespace-nowrap">
+                                    ${deptAliases[a.dept] || a.dept.substring(0, 2)}:${a.count}
+                                </div>`;
+                        });
 
-tableEl.appendChild(contentWrapper);
+                        tableEl.appendChild(contentWrapper);
 
                         if(isVeg) tableEl.innerHTML += `<div class="veg-marker">素</div>`;
                         
@@ -358,162 +339,154 @@ tableEl.appendChild(contentWrapper);
             renderCanvas();
         }
 
-       function renderSidebar() {
-    const list = document.getElementById('dept-list'), s = getStats(), depts = Object.keys(s);
-    list.innerHTML = '';
-    
-    let currentOrder = deptOrder.filter(d => depts.includes(d));
-    depts.forEach(d => { if(!currentOrder.includes(d)) currentOrder.push(d); });
-    deptOrder = currentOrder;
-
-    deptOrder.forEach((d, index) => {
-        const rem = getRemain(d, assignType);
-        const isSel = selectedDept === d;
-        const color = getDeptColor(d); 
-        
-        const div = document.createElement('div');
-        div.draggable = true;
-        div.className = `p-4 rounded-2xl border-2 cursor-pointer transition-all border-l-[12px] flex items-center justify-between font-black relative ${isSel?'ring-4 ring-indigo-500 ':''} ${rem>0?'bg-white shadow-md border-slate-200':'bg-slate-50 opacity-30 border-transparent text-slate-400'}`;
-        div.style.borderLeftColor = color; 
-        
-        div.ondragstart = (e) => { e.dataTransfer.setData('text/plain', index); div.style.opacity = "0.4"; };
-        div.ondragover = (e) => e.preventDefault();
-        div.ondrop = (e) => {
-            e.preventDefault();
-            const fromIdx = e.dataTransfer.getData('text/plain');
-            const movedItem = deptOrder.splice(fromIdx, 1)[0];
-            deptOrder.splice(index, 0, movedItem);
-            save(); renderSidebar();
-        };
-        div.ondragend = () => div.style.opacity = "1";
-
-        div.innerHTML = `<span>${d}</span><span class="bg-slate-100 px-3 py-1 rounded-lg text-indigo-600">${rem} 人</span>`;
-        
-        div.onclick = () => { if(rem > 0) { selectedDept = (selectedDept === d ? null : d); renderSidebar(); } };
-        
-       // --- 右鍵修改簡稱與顏色 (V13.8 一體化版本) ---
-        div.oncontextmenu = (e) => {
-            e.preventDefault();
+        function renderSidebar() {
+            const list = document.getElementById('dept-list'), s = getStats(), depts = Object.keys(s);
+            list.innerHTML = '';
             
-            // 移除可能已經存在的舊視窗
-            const oldMenu = document.getElementById('temp-context-menu');
-            if (oldMenu) oldMenu.remove();
+            let currentOrder = deptOrder.filter(d => depts.includes(d));
+            depts.forEach(d => { if(!currentOrder.includes(d)) currentOrder.push(d); });
+            deptOrder = currentOrder;
 
-            // 建立一個浮動小視窗
-            const menu = document.createElement('div');
-            menu.id = 'temp-context-menu';
-            menu.className = "fixed bg-white shadow-2xl rounded-2xl p-4 z-[200] border border-slate-200 flex flex-col gap-3 min-w-[200px]";
-            menu.style.left = `${e.clientX}px`;
-            menu.style.top = `${e.clientY}px`;
-
-            const currentColor = window.customDeptColors && window.customDeptColors[d] ? window.customDeptColors[d] : getDeptColor(d);
-            const currentAlias = deptAliases[d] || d.substring(0, 2);
-
-            menu.innerHTML = `
-                <div class="text-sm font-black text-slate-500 mb-1">${d} 設定</div>
-                <div>
-                    <label class="text-xs text-slate-400 block mb-1">部門簡稱 (2-3字)</label>
-                    <input id="edit-alias" type="text" class="w-full border rounded-lg px-2 py-1 font-bold" value="${currentAlias}">
-                </div>
-                <div>
-                    <label class="text-xs text-slate-400 block mb-1">部門代表色</label>
-                    <input id="edit-color" type="color" class="w-full h-10 border rounded-lg cursor-pointer" value="${currentColor}">
-                </div>
-                <div class="flex gap-2 mt-2">
-                    <button id="btn-save-edit" class="flex-1 bg-indigo-600 text-white py-2 rounded-lg text-sm font-bold">儲存</button>
-                    <button id="btn-cancel-edit" class="flex-1 bg-slate-100 text-slate-600 py-2 rounded-lg text-sm font-bold">取消</button>
-                </div>
-            `;
-
-            document.body.appendChild(menu);
-
-            // 儲存按鈕邏輯
-            document.getElementById('btn-save-edit').onclick = () => {
-                const newAlias = document.getElementById('edit-alias').value;
-                const newColor = document.getElementById('edit-color').value;
+            deptOrder.forEach((d, index) => {
+                const rem = getRemain(d, assignType);
+                const isSel = selectedDept === d;
+                const color = getDeptColor(d); 
                 
-                deptAliases[d] = newAlias;
-                if(!window.customDeptColors) window.customDeptColors = {};
-                window.customDeptColors[d] = newColor;
+                const div = document.createElement('div');
+                div.draggable = true;
+                div.className = `p-4 rounded-2xl border-2 cursor-pointer transition-all border-l-[12px] flex items-center justify-between font-black relative ${isSel?'ring-4 ring-indigo-500 ':''} ${rem>0?'bg-white shadow-md border-slate-200':'bg-slate-50 opacity-30 border-transparent text-slate-400'}`;
+                div.style.borderLeftColor = color; 
                 
-                save();
-                renderCanvas();
-                renderSidebar();
-                menu.remove();
-            };
+                div.ondragstart = (e) => { e.dataTransfer.setData('text/plain', index); div.style.opacity = "0.4"; };
+                div.ondragover = (e) => e.preventDefault();
+                div.ondrop = (e) => {
+                    e.preventDefault();
+                    const fromIdx = e.dataTransfer.getData('text/plain');
+                    const movedItem = deptOrder.splice(fromIdx, 1)[0];
+                    deptOrder.splice(index, 0, movedItem);
+                    save(); renderSidebar();
+                };
+                div.ondragend = () => div.style.opacity = "1";
 
-            // 取消按鈕邏輯
-            document.getElementById('btn-cancel-edit').onclick = () => menu.remove();
+                div.innerHTML = `<span>${d}</span><span class="bg-slate-100 px-3 py-1 rounded-lg text-indigo-600">${rem} 人</span>`;
+                
+                div.onclick = () => { if(rem > 0) { selectedDept = (selectedDept === d ? null : d); renderSidebar(); } };
+                
+                div.oncontextmenu = (e) => {
+                    e.preventDefault();
+                    
+                    const oldMenu = document.getElementById('temp-context-menu');
+                    if (oldMenu) oldMenu.remove();
 
-            // 點擊視窗外部自動關閉
-            const closeHandler = (ev) => {
-                if (!menu.contains(ev.target)) {
-                    menu.remove();
-                    document.removeEventListener('mousedown', closeHandler);
-                }
-            };
-            setTimeout(() => document.addEventListener('mousedown', closeHandler), 10);
-        };
+                    const menu = document.createElement('div');
+                    menu.id = 'temp-context-menu';
+                    menu.className = "fixed bg-white shadow-2xl rounded-2xl p-4 z-[200] border border-slate-200 flex flex-col gap-3 min-w-[200px]";
+                    menu.style.left = `${e.clientX}px`;
+                    menu.style.top = `${e.clientY}px`;
 
-        list.appendChild(div); // 這行剛才可能被刪掉了
-    }); // 這是 deptOrder.forEach 的結束
+                    const currentColor = window.customDeptColors && window.customDeptColors[d] ? window.customDeptColors[d] : getDeptColor(d);
+                    const currentAlias = deptAliases[d] || d.substring(0, 2);
 
-    let totalRem = 0; 
-    Object.keys(s).forEach(d => totalRem += getRemain(d, assignType));
-    document.getElementById('global-stats').innerText = `${assignType}食待排：${totalRem} 人`;
-} // 這是 renderSidebar 的結束
+                    menu.innerHTML = `
+                        <div class="text-sm font-black text-slate-500 mb-1">${d} 設定</div>
+                        <div>
+                            <label class="text-xs text-slate-400 block mb-1">部門簡稱 (2-3字)</label>
+                            <input id="edit-alias" type="text" class="w-full border rounded-lg px-2 py-1 font-bold" value="${currentAlias}">
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-400 block mb-1">部門代表色</label>
+                            <input id="edit-color" type="color" class="w-full h-10 border rounded-lg cursor-pointer" value="${currentColor}">
+                        </div>
+                        <div class="flex gap-2 mt-2">
+                            <button id="btn-save-edit" class="flex-1 bg-indigo-600 text-white py-2 rounded-lg text-sm font-bold">儲存</button>
+                            <button id="btn-cancel-edit" class="flex-1 bg-slate-100 text-slate-600 py-2 rounded-lg text-sm font-bold">取消</button>
+                        </div>
+                    `;
 
-      function save(){ 
-    localStorage.setItem('tailor_v13_data', JSON.stringify({ 
-        rawData, 
-        tables, 
-        deptAliases, 
-        deptOrder,
-        customDeptColors: window.customDeptColors // 存顏色
-    })); 
-}
+                    document.body.appendChild(menu);
+
+                    document.getElementById('btn-save-edit').onclick = () => {
+                        const newAlias = document.getElementById('edit-alias').value;
+                        const newColor = document.getElementById('edit-color').value;
+                        
+                        deptAliases[d] = newAlias;
+                        if(!window.customDeptColors) window.customDeptColors = {};
+                        window.customDeptColors[d] = newColor;
+                        
+                        save();
+                        renderCanvas();
+                        renderSidebar();
+                        menu.remove();
+                    };
+
+                    document.getElementById('btn-cancel-edit').onclick = () => menu.remove();
+
+                    const closeHandler = (ev) => {
+                        if (!menu.contains(ev.target)) {
+                            menu.remove();
+                            document.removeEventListener('mousedown', closeHandler);
+                        }
+                    };
+                    setTimeout(() => document.addEventListener('mousedown', closeHandler), 10);
+                };
+
+                list.appendChild(div);
+            });
+
+            let totalRem = 0; 
+            Object.keys(s).forEach(d => totalRem += getRemain(d, assignType));
+            document.getElementById('global-stats').innerText = `${assignType}食待排：${totalRem} 人`;
+        }
+
+        function save(){ 
+            localStorage.setItem('tailor_v13_data', JSON.stringify({ 
+                rawData, 
+                tables, 
+                deptAliases, 
+                deptOrder,
+                customDeptColors: window.customDeptColors
+            })); 
+        }
 
         function openManageModal(t) {
-    document.getElementById('modal-title').innerText = `管理 ${t.displayId} 號桌`;
-    const c = document.getElementById('modal-content'); 
-    c.innerHTML = '<p class="text-xs text-slate-400 mb-2">💡 點擊部門名稱可切換桌子代表色</p>';
-    
-    t.assigned = (t.assigned || []).filter(a => a.count > 0);
-    
-    t.assigned.forEach((a, i) => {
-        const itemDiv = document.createElement('div');
-        // 判斷是否為目前選定的主色，若是則加強邊框
-        const isPrimary = (t.primaryDept === a.dept) || (!t.primaryDept && i === 0);
-        
-        itemDiv.className = `p-3 border-2 rounded-xl flex justify-between items-center mb-2 font-bold cursor-pointer transition-all ${isPrimary ? 'border-indigo-600 bg-indigo-50' : 'bg-white border-slate-100 opacity-70'}`;
-        
-        // 點擊整列即可切換主色
-        itemDiv.onclick = () => {
-            t.primaryDept = a.dept; 
-            openManageModal(t); // 重新刷一下 Modal 顯示選中狀態
-        };
+            document.getElementById('modal-title').innerText = `管理 ${t.displayId} 號桌`;
+            const c = document.getElementById('modal-content'); 
+            c.innerHTML = '<p class="text-xs text-slate-400 mb-2">💡 點擊部門名稱可切換桌子代表色</p>';
+            
+            t.assigned = (t.assigned || []).filter(a => a.count > 0);
+            
+            t.assigned.forEach((a, i) => {
+                const itemDiv = document.createElement('div');
+                const isPrimary = (t.primaryDept === a.dept) || (!t.primaryDept && i === 0);
+                
+                itemDiv.className = `p-3 border-2 rounded-xl flex justify-between items-center mb-2 font-bold cursor-pointer transition-all ${isPrimary ? 'border-indigo-600 bg-indigo-50' : 'bg-white border-slate-100 opacity-70'}`;
+                
+                itemDiv.onclick = () => {
+                    t.primaryDept = a.dept; 
+                    openManageModal(t);
+                };
 
-        const label = document.createElement('div');
-        label.className = "flex items-center gap-2";
-        label.innerHTML = `
-            <div class="w-4 h-4 rounded-full" style="background-color:${getDeptColor(a.dept)}"></div>
-            <span class="text-sm">${a.dept} (${a.type})</span>
-        `;
+                const label = document.createElement('div');
+                label.className = "flex items-center gap-2";
+                label.innerHTML = `
+                    <div class="w-4 h-4 rounded-full" style="background-color:${getDeptColor(a.dept)}"></div>
+                    <span class="text-sm">${a.dept} (${a.type})</span>
+                `;
 
-        const input = document.createElement('input');
-        input.type = "number"; 
-        input.value = a.count; 
-        input.className = "w-16 border rounded text-center font-bold px-1";
-        // 防止輸入時觸發父層的 onclick
-        input.onclick = (e) => e.stopPropagation();
-        input.onchange = () => { t.assigned[i].count = parseInt(input.value) || 0; };
-        
-        itemDiv.appendChild(label);
-        itemDiv.appendChild(input);
-        c.appendChild(itemDiv);
-    });
-    document.getElementById('manage-modal').classList.remove('hidden');
-}
+                const input = document.createElement('input');
+                input.type = "number"; 
+                input.value = a.count; 
+                input.className = "w-16 border rounded text-center font-bold px-1";
+                input.onclick = (e) => e.stopPropagation();
+                input.onchange = () => { t.assigned[i].count = parseInt(input.value) || 0; };
+                
+                itemDiv.appendChild(label);
+                itemDiv.appendChild(input);
+                c.appendChild(itemDiv);
+            });
+            document.getElementById('manage-modal').classList.remove('hidden');
+        }
+
         function saveAndCloseManage() {
             document.getElementById('manage-modal').classList.add('hidden');
             renderCanvas();
@@ -521,126 +494,160 @@ tableEl.appendChild(contentWrapper);
 
         function setMode(m) { currentTableMode = m; document.getElementById('mode-normal').classList.toggle('btn-active-indigo', m==='normal'); document.getElementById('mode-main').classList.toggle('btn-active-orange', m==='main'); }
         function setAssignType(t) { 
-    assignType = t; 
-    selectedDept = null; 
-    
-    // 更新按鈕樣式
-    document.getElementById('btn-meat').classList.toggle('btn-active-indigo', t==='葷'); 
-    document.getElementById('btn-veg').classList.toggle('btn-active-green', t==='素'); 
+            assignType = t; 
+            selectedDept = null; 
+            
+            document.getElementById('btn-meat').classList.toggle('btn-active-indigo', t==='葷'); 
+            document.getElementById('btn-veg').classList.toggle('btn-active-green', t==='素'); 
 
-    // 如果切換到素食，執行自動重排
-    if (t === '素') {
-        autoSortVegFirst();
-    }
-    
-    renderSidebar(); 
-}
+            if (t === '素') {
+                autoSortVegFirst();
+            }
+            
+            renderSidebar(); 
+        }
 
-// 自動將有素食的部門排到最前面的邏輯
-function autoSortVegFirst() {
-    const s = getStats();
-    // 將部門分成：有素食待排、無素食待排
-    const hasVeg = [], noVeg = [];
-    
-    deptOrder.forEach(d => {
-        const remVeg = getRemain(d, '素');
-        if (remVeg > 0) hasVeg.push(d);
-        else noVeg.push(d);
-    });
-    
-    // 重新組合順序：有素食的在前，其餘在後
-    deptOrder = [...hasVeg, ...noVeg];
-    save(); // 存下這個由系統調整過的順序
-}
+        function autoSortVegFirst() {
+            const s = getStats();
+            const hasVeg = [], noVeg = [];
+            
+            deptOrder.forEach(d => {
+                const remVeg = getRemain(d, '素');
+                if (remVeg > 0) hasVeg.push(d);
+                else noVeg.push(d);
+            });
+            
+            deptOrder = [...hasVeg, ...noVeg];
+            save();
+        }
 
         function exportProject() { 
-    const a = document.createElement('a'); 
-    a.href = URL.createObjectURL(new Blob([JSON.stringify({rawData, tables, deptAliases, deptOrder})], {type: 'application/json'})); 
-    a.download = `尾牙專案.json`; 
-    a.click(); 
-}
-      function importProject(input) { 
-    // 防呆機制：檢查是否已有資料，並詢問使用者
-    const hasData = rawData.length > 0 || tables.length > 0;
-    if (hasData) {
-        const proceed = confirm("⚠️ 注意：匯入新專案將會「完全覆蓋」目前所有的名單與桌位圖！\n\n您確定要繼續嗎？");
-        if (!proceed) {
-            input.value = ''; // 清空 input 讓下次選同一個檔案也能觸發
-            return;
+            const a = document.createElement('a'); 
+            a.href = URL.createObjectURL(new Blob([JSON.stringify({rawData, tables, deptAliases, deptOrder})], {type: 'application/json'})); 
+            a.download = `尾牙專案.json`; 
+            a.click(); 
         }
-    }
 
-    const reader = new FileReader(); 
-    reader.onload = (e) => { 
-        try {
-            const d = JSON.parse(e.target.result); 
+        function importProject(input) { 
+            const hasData = rawData.length > 0 || tables.length > 0;
+            if (hasData) {
+                const proceed = confirm("⚠️ 注意：匯入新專案將會「完全覆蓋」目前所有的名單與桌位圖！\n\n您確定要繼續嗎？");
+                if (!proceed) {
+                    input.value = '';
+                    return;
+                }
+            }
+
+            const reader = new FileReader(); 
+            reader.onload = (e) => { 
+                try {
+                    const d = JSON.parse(e.target.result); 
+                    
+                    rawData = d.rawData || []; 
+                    tables = d.tables || []; 
+                    deptAliases = d.deptAliases || {}; 
+                    deptOrder = d.deptOrder || []; 
+                    window.customDeptColors = d.customDeptColors || {};
+
+                    save();
+                    renderCanvas(); 
+                    alert("專案已成功匯入！");
+                } catch (err) {
+                    alert("讀取失敗：檔案格式不正確。");
+                    console.error(err);
+                }
+                input.value = '';
+            }; 
             
-            // 讀取資料
-            rawData = d.rawData || []; 
-            tables = d.tables || []; 
-            deptAliases = d.deptAliases || {}; 
-            deptOrder = d.deptOrder || []; 
-            window.customDeptColors = d.customDeptColors || {}; // 同步讀取自定義顏色
-
-            // 成功匯入後立即儲存到瀏覽器並重繪
-            save();
-            renderCanvas(); 
-            alert("專案已成功匯入！");
-        } catch (err) {
-            alert("讀取失敗：檔案格式不正確。");
-            console.error(err);
+            if (input.files[0]) {
+                reader.readAsText(input.files[0]);
+            }
         }
-        input.value = ''; // 處理完後清空
-    }; 
-    
-    if (input.files[0]) {
-        reader.readAsText(input.files[0]);
-    }
-}
+
         function exportImage() {
-    const captureArea = document.getElementById('capture-area');
-    const scrollWrapper = document.getElementById('scroll-wrapper');
+            const captureArea = document.getElementById('capture-area');
+            const scrollWrapper = document.getElementById('scroll-wrapper');
 
-    const oldScrollTop = scrollWrapper.scrollTop;
-    const oldScrollLeft = scrollWrapper.scrollLeft;
+            const oldScrollTop = scrollWrapper.scrollTop;
+            const oldScrollLeft = scrollWrapper.scrollLeft;
 
-    scrollWrapper.scrollTop = 0;
-    scrollWrapper.scrollLeft = 0;
+            scrollWrapper.scrollTop = 0;
+            scrollWrapper.scrollLeft = 0;
 
-    // 增加一個小延遲，確保瀏覽器重新渲染佈局後再截圖
-    setTimeout(() => {
-        html2canvas(captureArea, { 
-            scale: 2, 
-            useCORS: true,
-            backgroundColor: "#e2e8f0",
-            scrollY: 0, 
-            scrollX: 0,
-            // 新增這兩行優化參數
-            logging: false,
-            width: captureArea.offsetWidth,
-            height: captureArea.offsetHeight
-        }).then(canvas => {
-            const a = document.createElement('a');
-            const date = new Date().toISOString().split('T')[0];
-            a.download = `貿協尾牙桌圖_${date}.png`;
-            a.href = canvas.toDataURL("image/png");
-            a.click();
-            
-            scrollWrapper.scrollTop = oldScrollTop;
-            scrollWrapper.scrollLeft = oldScrollLeft;
-        });
-    }, 100); 
-}
-        
+            setTimeout(() => {
+                html2canvas(captureArea, { 
+                    scale: 2, 
+                    useCORS: true,
+                    backgroundColor: "#e2e8f0",
+                    scrollY: 0, 
+                    scrollX: 0,
+                    logging: false,
+                    width: captureArea.offsetWidth,
+                    height: captureArea.offsetHeight
+                }).then(canvas => {
+                    const a = document.createElement('a');
+                    const date = new Date().toISOString().split('T')[0];
+                    a.download = `貿協尾牙桌圖_${date}.png`;
+                    a.href = canvas.toDataURL("image/png");
+                    a.click();
+                    
+                    scrollWrapper.scrollTop = oldScrollTop;
+                    scrollWrapper.scrollLeft = oldScrollLeft;
+                });
+            }, 100); 
+        }
+
+        // --- 優化：連續分配邏輯 (分配完後保持選取，若人數扣完才自動取消選取) ---
         function assignToTable(t) {
             const isVeg = (t.assigned||[]).some(a=>a.type==='素'), isMeat = (t.assigned||[]).some(a=>a.type==='葷');
             if((assignType==='素'&&isMeat) || (assignType==='葷'&&isVeg)) return alert("葷素不可併桌");
+            
             const rem = getRemain(selectedDept, assignType);
-            const count = parseInt(prompt(`分配 ${selectedDept} (${assignType}) 到 ${t.displayId} 桌`, rem));
-            if(count > 0) {
+            if (rem <= 0) {
+                selectedDept = null;
+                renderCanvas();
+                return;
+            }
+
+            const countInput = prompt(`分配 ${selectedDept} (${assignType}) 到 ${t.displayId} 桌\n(待排人數：${rem} 人)`, rem);
+            if (countInput === null) return; // 使用者點取消
+
+            const count = parseInt(countInput);
+            if (count > 0) {
                 const ex = t.assigned.find(a=>a.dept===selectedDept && a.type===assignType);
                 if(ex) ex.count += count; else t.assigned.push({dept:selectedDept, count, type:assignType});
-                selectedDept = null; renderCanvas();
+                
+                // 檢查分配完後該部門是否還有剩餘人數，若無剩餘則取消選取狀態
+                if (getRemain(selectedDept, assignType) <= 0) {
+                    selectedDept = null;
+                }
+                renderCanvas();
+            }
+        }
+
+        // --- 新增：全系統 RESET 邏輯 (包含提示與雙重備份下載) ---
+        function resetSystem() {
+            const confirmReset = confirm("⚠️ 警告：這將會【完全清空】所有已匯入的名單、桌位配置與自訂顏色設定！\n\n系統將會在清空前自動為您下載：「專案JSON檔」與「名單Excel檔」備份。\n\n您確定要繼續 RESET 嗎？");
+            
+            if (confirmReset) {
+                // 1. 自動備份專案與名單
+                if (rawData.length > 0 || tables.length > 0) {
+                    exportProject();
+                    if (rawData.length > 0) exportExcelList();
+                }
+
+                // 2. 清空數據與本地儲存
+                rawData = [];
+                tables = [];
+                deptAliases = {};
+                deptOrder = [];
+                window.customDeptColors = {};
+                selectedDept = null;
+                localStorage.removeItem('tailor_v13_data');
+
+                // 3. 重新渲染畫面
+                renderCanvas();
+                alert("全系統已完成 RESET 重置！備份檔案已自動下載。");
             }
         }
 
@@ -657,25 +664,20 @@ function autoSortVegFirst() {
             };
             reader.readAsArrayBuffer(e.target.files[0]);
         };
-function exportExcelList() {
-    if (rawData.length === 0) return alert("沒有名單可以匯出！");
-    
-    // 準備標題列
-    const data = [["單位 (部門)", "組別", "員編", "姓名", "飲食選擇"]];
-    
-    // 放入名單數據
-    rawData.forEach(item => {
-        data.push([item.dept, item.group, item.id, item.name, item.diet]);
-    });
 
-    const ws = XLSX.utils.aoa_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "員工名單");
-    
-    // 檔名加上今天的日期
-    const date = new Date().toISOString().split('T')[0];
-    XLSX.writeFile(wb, `貿協尾牙名單_${date}.xlsx`);
-}
+        function exportExcelList() {
+            if (rawData.length === 0) return alert("沒有名單可以匯出！");
+            const data = [["單位 (部門)", "組別", "員編", "姓名", "飲食選擇"]];
+            rawData.forEach(item => {
+                data.push([item.dept, item.group, item.id, item.name, item.diet]);
+            });
+            const ws = XLSX.utils.aoa_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "員工名單");
+            const date = new Date().toISOString().split('T')[0];
+            XLSX.writeFile(wb, `貿協尾牙名單_${date}.xlsx`);
+        }
+
         init();
     </script>
 </body>
