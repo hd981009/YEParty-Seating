@@ -43,7 +43,7 @@
         <div class="flex items-center justify-between mb-4">
             <h1 class="text-2xl font-black text-indigo-600 tracking-tighter">尾牙排座系統</h1>
             <button onclick="resetSystem()" title="全系統重置" class="px-2.5 py-1 bg-red-50 hover:bg-red-600 hover:text-white text-red-600 border border-red-200 rounded-lg font-bold text-xs transition-all shadow-sm flex items-center gap-1">
-                ⚠️ RESET
+                RESET
             </button>
         </div>
 
@@ -627,7 +627,7 @@
         }
 
         function resetSystem() {
-            const confirmReset = confirm("⚠️ 警告：這將會【完全清空】所有已匯入的名單、桌位配置與自訂顏色設定！\n\n系統將會在清空前自動為您下載：「專案JSON檔」與「名單Excel檔」備份。\n\n您確定要繼續 RESET 嗎？");
+            const confirmReset = confirm("⚠️ 警告：這將會【完全清空】所有系統資料！\n\n將於清空前自動下載備份：「專案JSON檔」、「名單Excel」。\n\n您確定要繼續 RESET 嗎？");
             
             if (confirmReset) {
                 if (rawData.length > 0 || tables.length > 0) {
@@ -644,7 +644,7 @@
                 localStorage.removeItem('tailor_v13_data');
 
                 renderCanvas();
-                alert("全系統已完成 RESET 重置！備份檔案已自動下載。");
+                alert("系統已重置！備份檔案已自動下載。");
             }
         }
 
