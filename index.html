@@ -39,7 +39,13 @@
 <body class="bg-slate-100 font-sans min-h-screen flex text-slate-800 overflow-hidden" oncontextmenu="return false;">
 
     <div class="w-96 bg-white shadow-2xl h-screen flex flex-col border-r z-50 p-5 flex-shrink-0">
-        <h1 class="text-2xl font-black text-indigo-600 mb-4 tracking-tighter">尾牙排座系統 V13.9</h1>
+        <!-- 標題與RESET按鈕並排 -->
+        <div class="flex items-center justify-between mb-4">
+            <h1 class="text-2xl font-black text-indigo-600 tracking-tighter">尾牙排座系統</h1>
+            <button onclick="resetSystem()" title="全系統重置" class="px-2.5 py-1 bg-red-50 hover:bg-red-600 hover:text-white text-red-600 border border-red-200 rounded-lg font-bold text-xs transition-all shadow-sm flex items-center gap-1">
+                ⚠️ RESET
+            </button>
+        </div>
 
         <div class="grid grid-cols-2 gap-2 mb-4">
             <button onclick="setMode('normal')" id="mode-normal" class="py-3 rounded-xl border-2 border-slate-100 text-slate-400 font-bold text-base transition-all btn-active-indigo">一般桌 (10人)</button>
@@ -65,7 +71,6 @@
             <button onclick="exportProject()" class="py-2 border border-slate-200 rounded text-xs text-slate-400">儲存專案</button>
             <button onclick="document.getElementById('import-project').click()" class="py-2 border border-slate-200 rounded text-xs text-slate-400">讀取專案</button>
             <input type="file" id="import-project" class="hidden" onchange="importProject(this)">
-            <button onclick="resetSystem()" class="col-span-2 py-2.5 bg-red-100 hover:bg-red-600 hover:text-white text-red-600 rounded-xl font-bold text-xs transition-all shadow-sm">⚠️ RESET 全系統重置</button>
         </div> 
     </div>
 
@@ -597,7 +602,6 @@
             }, 100); 
         }
 
-        // --- 優化：連續分配邏輯 (分配完後保持選取，若人數扣完才自動取消選取) ---
         function assignToTable(t) {
             const isVeg = (t.assigned||[]).some(a=>a.type==='素'), isMeat = (t.assigned||[]).some(a=>a.type==='葷');
             if((assignType==='素'&&isMeat) || (assignType==='葷'&&isVeg)) return alert("葷素不可併桌");
@@ -610,14 +614,13 @@
             }
 
             const countInput = prompt(`分配 ${selectedDept} (${assignType}) 到 ${t.displayId} 桌\n(待排人數：${rem} 人)`, rem);
-            if (countInput === null) return; // 使用者點取消
+            if (countInput === null) return;
 
             const count = parseInt(countInput);
             if (count > 0) {
                 const ex = t.assigned.find(a=>a.dept===selectedDept && a.type===assignType);
                 if(ex) ex.count += count; else t.assigned.push({dept:selectedDept, count, type:assignType});
                 
-                // 檢查分配完後該部門是否還有剩餘人數，若無剩餘則取消選取狀態
                 if (getRemain(selectedDept, assignType) <= 0) {
                     selectedDept = null;
                 }
@@ -625,18 +628,15 @@
             }
         }
 
-        // --- 新增：全系統 RESET 邏輯 (包含提示與雙重備份下載) ---
         function resetSystem() {
             const confirmReset = confirm("⚠️ 警告：這將會【完全清空】所有已匯入的名單、桌位配置與自訂顏色設定！\n\n系統將會在清空前自動為您下載：「專案JSON檔」與「名單Excel檔」備份。\n\n您確定要繼續 RESET 嗎？");
             
             if (confirmReset) {
-                // 1. 自動備份專案與名單
                 if (rawData.length > 0 || tables.length > 0) {
                     exportProject();
                     if (rawData.length > 0) exportExcelList();
                 }
 
-                // 2. 清空數據與本地儲存
                 rawData = [];
                 tables = [];
                 deptAliases = {};
@@ -645,7 +645,6 @@
                 selectedDept = null;
                 localStorage.removeItem('tailor_v13_data');
 
-                // 3. 重新渲染畫面
                 renderCanvas();
                 alert("全系統已完成 RESET 重置！備份檔案已自動下載。");
             }
